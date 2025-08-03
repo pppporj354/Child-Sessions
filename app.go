@@ -6,6 +6,7 @@ import (
 	"childSessions/services"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -182,6 +183,36 @@ func (a *App) GetSessionActivities(sessionID uint) ([]model.SessionActivity, err
 		return nil, fmt.Errorf("gagal mengambil aktivitas sesi: %w", err)
 	}
 	return sessionActivities, nil
+}
+
+// UpdateActivityInSession updates notes for an ongoing activity
+func (a *App) UpdateActivityInSession(sessionActivityID uint, notes string) (*model.SessionActivity, error) {
+    var sessionActivity model.SessionActivity
+    if err := a.database.First(&sessionActivity, sessionActivityID).Error; err != nil {
+        return nil, fmt.Errorf("aktivitas sesi tidak ditemukan: %w", err)
+    }
+
+    sessionActivity.Notes = notes
+
+    if err := a.database.Save(&sessionActivity).Error; err != nil {
+        return nil, fmt.Errorf("gagal memperbarui catatan aktivitas: %w", err)
+    }
+
+    // Load relationships
+    if err := a.database.Preload("Activity").Preload("Session").First(&sessionActivity, sessionActivity.ID).Error; err != nil {
+        return nil, fmt.Errorf("gagal memuat data aktivitas sesi: %w", err)
+    }
+
+    return &sessionActivity, nil
+}
+
+// GetActiveActivitiesInSession retrieves currently running activities in a session
+func (a *App) GetActiveActivitiesInSession(sessionID uint) ([]model.SessionActivity, error) {
+    var sessionActivities []model.SessionActivity
+    if err := a.database.Preload("Activity").Where("session_id = ? AND end_time IS NULL", sessionID).Find(&sessionActivities).Error; err != nil {
+        return nil, fmt.Errorf("gagal mengambil aktivitas aktif: %w", err)
+    }
+    return sessionActivities, nil
 }
 
 // ===== NOTE MANAGEMENT =====
@@ -519,4 +550,261 @@ func (a *App) ValidateSession(sessionID uint) (bool, error) {
 
 	// Session is active if it has no end time
 	return session.EndTime == nil, nil
+}
+
+// GenerateSessionSummary creates an auto-formatted summary of the session
+func (a *App) GenerateSessionSummary(sessionID uint) (map[string]interface{}, error) {
+    // Get session details
+    var session model.Session
+    if err := a.database.Preload("Child").Preload("Notes").Preload("SessionActivities.Activity").Preload("Rewards").First(&session, sessionID).Error; err != nil {
+        return nil, fmt.Errorf("gagal mengambil data sesi: %w", err)
+    }
+
+    // Calculate session duration
+    var duration int
+    if session.EndTime != nil {
+        duration = int(session.EndTime.Sub(session.StartTime).Minutes())
+    } else {
+        duration = int(time.Since(session.StartTime).Minutes())
+    }
+
+    // Count activities by status
+    completedActivities := 0
+    ongoingActivities := 0
+    totalActivitiesDuration := 0
+    activitiesSummary := make([]map[string]interface{}, 0)
+
+    for _, activity := range session.SessionActivities {
+        activitySummary := map[string]interface{}{
+            "name":       activity.Activity.Name,
+            "start_time": activity.StartTime,
+            "end_time":   activity.EndTime,
+            "notes":      activity.Notes,
+            "status":     "ongoing",
+            "duration":   0,
+        }
+
+        if activity.EndTime != nil {
+            completedActivities++
+            activitySummary["status"] = "completed"
+            if activity.StartTime != nil {
+                activityDuration := int(activity.EndTime.Sub(*activity.StartTime).Minutes())
+                totalActivitiesDuration += activityDuration
+                activitySummary["duration"] = activityDuration
+            }
+        } else {
+            ongoingActivities++
+            if activity.StartTime != nil {
+                currentDuration := int(time.Since(*activity.StartTime).Minutes())
+                activitySummary["duration"] = currentDuration
+            }
+        }
+
+        activitiesSummary = append(activitiesSummary, activitySummary)
+    }
+
+    // Categorize notes
+    notesByCategory := make(map[string][]model.Note)
+    for _, note := range session.Notes {
+        category := note.Category
+        if category == "" {
+            category = "Umum"
+        }
+        notesByCategory[category] = append(notesByCategory[category], note)
+    }
+
+    // Count rewards
+    rewardsByType := make(map[string]int)
+    totalRewards := 0
+    for _, reward := range session.Rewards {
+        rewardsByType[reward.Type] += reward.Value
+        totalRewards += reward.Value
+    }
+
+    // Generate formatted summary text
+    summaryText := a.formatSessionSummaryText(session, duration, activitiesSummary, notesByCategory, rewardsByType)
+
+    summary := map[string]interface{}{
+        "session_id":               session.ID,
+        "child_name":               session.Child.Name,
+        "start_time":               session.StartTime,
+        "end_time":                 session.EndTime,
+        "duration_minutes":         duration,
+        "total_activities":         len(session.SessionActivities),
+        "completed_activities":     completedActivities,
+        "ongoing_activities":       ongoingActivities,
+        "total_activities_duration": totalActivitiesDuration,
+        "total_notes":              len(session.Notes),
+        "notes_by_category":        notesByCategory,
+        "total_rewards":            totalRewards,
+        "rewards_by_type":          rewardsByType,
+        "activities_summary":       activitiesSummary,
+        "formatted_summary":        summaryText,
+        "summary_notes":            session.SummaryNotes,
+        "generated_at":             time.Now(),
+    }
+
+    return summary, nil
+}
+
+// formatSessionSummaryText creates a formatted text summary
+func (a *App) formatSessionSummaryText(session model.Session, duration int, activities []map[string]interface{}, notesByCategory map[string][]model.Note, rewards map[string]int) string {
+    var summary strings.Builder
+    
+	summary.WriteString("RINGKASAN SESI TERAPI\n")
+	summary.WriteString("====================\n\n")
+    summary.WriteString(fmt.Sprintf("Anak: %s\n", session.Child.Name))
+    summary.WriteString(fmt.Sprintf("Tanggal: %s\n", session.StartTime.Format("02 January 2006")))
+    summary.WriteString(fmt.Sprintf("Waktu: %s", session.StartTime.Format("15:04")))
+    
+    if session.EndTime != nil {
+        summary.WriteString(fmt.Sprintf(" - %s\n", session.EndTime.Format("15:04")))
+    } else {
+        summary.WriteString(" (Sesi masih berlangsung)\n")
+    }
+    
+    summary.WriteString(fmt.Sprintf("Durasi: %d menit\n\n", duration))
+
+    // Activities section
+    if len(activities) > 0 {
+        summary.WriteString("AKTIVITAS:\n")
+        summary.WriteString("----------\n")
+        for _, activity := range activities {
+            summary.WriteString(fmt.Sprintf("• %s", activity["name"]))
+            if dur, ok := activity["duration"].(int); ok && dur > 0 {
+                summary.WriteString(fmt.Sprintf(" (%d menit)", dur))
+            }
+            if activity["status"] == "completed" {
+                summary.WriteString(" ✓")
+            } else {
+                summary.WriteString(" (berlangsung)")
+            }
+            summary.WriteString("\n")
+            
+            if notes, ok := activity["notes"].(string); ok && notes != "" {
+                summary.WriteString(fmt.Sprintf("  Catatan: %s\n", notes))
+            }
+        }
+        summary.WriteString("\n")
+    }
+
+    // Notes section
+    if len(notesByCategory) > 0 {
+        summary.WriteString("CATATAN OBSERVASI:\n")
+        summary.WriteString("------------------\n")
+        for category, notes := range notesByCategory {
+            if len(notes) > 0 {
+                summary.WriteString(fmt.Sprintf("%s:\n", category))
+                for _, note := range notes {
+                    summary.WriteString(fmt.Sprintf("• %s\n", note.NoteText))
+                }
+                summary.WriteString("\n")
+            }
+        }
+    }
+
+    // Rewards section
+    if len(rewards) > 0 {
+        summary.WriteString("REWARD DIBERIKAN:\n")
+        summary.WriteString("-----------------\n")
+        for rewardType, count := range rewards {
+            summary.WriteString(fmt.Sprintf("• %s: %d\n", rewardType, count))
+        }
+        summary.WriteString("\n")
+    }
+
+    // Summary notes
+    if session.SummaryNotes != "" {
+        summary.WriteString("CATATAN RINGKASAN:\n")
+        summary.WriteString("------------------\n")
+        summary.WriteString(session.SummaryNotes)
+        summary.WriteString("\n")
+    }
+
+    return summary.String()
+}
+
+// GetSessionProgress gets real-time session progress
+func (a *App) GetSessionProgress(sessionID uint) (map[string]interface{}, error) {
+    var session model.Session
+    if err := a.database.Preload("Child").Preload("SessionActivities.Activity").First(&session, sessionID).Error; err != nil {
+        return nil, fmt.Errorf("sesi tidak ditemukan: %w", err)
+    }
+
+    currentTime := time.Now()
+    sessionDuration := int(currentTime.Sub(session.StartTime).Minutes())
+    
+    activeActivitiesCount := 0
+    completedActivitiesCount := 0
+    totalActivityTime := 0
+
+    for _, activity := range session.SessionActivities {
+        if activity.EndTime == nil {
+            activeActivitiesCount++
+        } else {
+            completedActivitiesCount++
+            if activity.StartTime != nil {
+                totalActivityTime += int(activity.EndTime.Sub(*activity.StartTime).Minutes())
+            }
+        }
+    }
+
+    progress := map[string]interface{}{
+        "session_id":                sessionID,
+        "child_name":                session.Child.Name,
+        "is_active":                 session.EndTime == nil,
+        "session_duration_minutes":  sessionDuration,
+        "total_activities":          len(session.SessionActivities),
+        "active_activities":         activeActivitiesCount,
+        "completed_activities":      completedActivitiesCount,
+        "total_activity_time":       totalActivityTime,
+        "session_start":             session.StartTime,
+        "last_updated":              currentTime,
+    }
+
+    return progress, nil
+}
+
+// UpdateSessionSummaryNotes updates the summary notes for a session
+func (a *App) UpdateSessionSummaryNotes(sessionID uint, summaryNotes string) error {
+    var session model.Session
+    if err := a.database.First(&session, sessionID).Error; err != nil {
+        return fmt.Errorf("sesi tidak ditemukan: %w", err)
+    }
+
+    session.SummaryNotes = summaryNotes
+    
+    if err := a.database.Save(&session).Error; err != nil {
+        return fmt.Errorf("gagal memperbarui catatan ringkasan: %w", err)
+    }
+
+    return nil
+}
+
+// AutoPauseInactiveActivities pauses activities that have been running too long
+func (a *App) AutoPauseInactiveActivities(sessionID uint, maxDurationMinutes int) ([]model.SessionActivity, error) {
+    cutoffTime := time.Now().Add(-time.Duration(maxDurationMinutes) * time.Minute)
+    
+    var longRunningActivities []model.SessionActivity
+    if err := a.database.Preload("Activity").
+        Where("session_id = ? AND end_time IS NULL AND start_time < ?", sessionID, cutoffTime).
+        Find(&longRunningActivities).Error; err != nil {
+        return nil, fmt.Errorf("gagal mencari aktivitas yang berjalan lama: %w", err)
+    }
+
+    var pausedActivities []model.SessionActivity
+    now := time.Now()
+    
+    for _, activity := range longRunningActivities {
+        activity.EndTime = &now
+        activity.Notes += fmt.Sprintf(" (Dihentikan otomatis setelah %d menit)", maxDurationMinutes)
+        
+        if err := a.database.Save(&activity).Error; err != nil {
+            continue // Skip if error, but continue with others
+        }
+        
+        pausedActivities = append(pausedActivities, activity)
+    }
+
+    return pausedActivities, nil
 }

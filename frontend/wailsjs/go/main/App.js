@@ -14,6 +14,10 @@ export function AddReward(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['AddReward'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function AutoPauseInactiveActivities(arg1, arg2) {
+  return window['go']['main']['App']['AutoPauseInactiveActivities'](arg1, arg2);
+}
+
 export function CreateActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateActivity'](arg1, arg2, arg3);
 }
@@ -48,6 +52,14 @@ export function EndActivityInSession(arg1, arg2) {
 
 export function EndSession(arg1, arg2) {
   return window['go']['main']['App']['EndSession'](arg1, arg2);
+}
+
+export function GenerateSessionSummary(arg1) {
+  return window['go']['main']['App']['GenerateSessionSummary'](arg1);
+}
+
+export function GetActiveActivitiesInSession(arg1) {
+  return window['go']['main']['App']['GetActiveActivitiesInSession'](arg1);
 }
 
 export function GetActiveSession(arg1) {
@@ -110,6 +122,10 @@ export function GetSessionNotes(arg1) {
   return window['go']['main']['App']['GetSessionNotes'](arg1);
 }
 
+export function GetSessionProgress(arg1) {
+  return window['go']['main']['App']['GetSessionProgress'](arg1);
+}
+
 export function GetSessionsByChild(arg1) {
   return window['go']['main']['App']['GetSessionsByChild'](arg1);
 }
@@ -130,12 +146,20 @@ export function StartSession(arg1) {
   return window['go']['main']['App']['StartSession'](arg1);
 }
 
+export function UpdateActivityInSession(arg1, arg2) {
+  return window['go']['main']['App']['UpdateActivityInSession'](arg1, arg2);
+}
+
 export function UpdateChild(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['UpdateChild'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function UpdateNote(arg1, arg2, arg3) {
   return window['go']['main']['App']['UpdateNote'](arg1, arg2, arg3);
+}
+
+export function UpdateSessionSummaryNotes(arg1, arg2) {
+  return window['go']['main']['App']['UpdateSessionSummaryNotes'](arg1, arg2);
 }
 
 export function ValidateSession(arg1) {

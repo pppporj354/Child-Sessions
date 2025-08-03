@@ -6,11 +6,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Plus, Play, Square, Clock, CheckCircle } from "lucide-react"
+import {
+  Plus,
+  Play,
+  Square,
+  Clock,
+  CheckCircle,
+  Edit3,
+  Pause,
+} from "lucide-react"
 import {
   GetAllActivities,
   StartActivityInSession,
   EndActivityInSession,
+  UpdateActivityInSession,
+  GetActiveActivitiesInSession,
 } from "../../../wailsjs/go/main/App"
 import { model } from "../../../wailsjs/go/models"
 
@@ -36,13 +46,21 @@ export function ActivitySection({
   )
   const [activityNotes, setActivityNotes] = useState("")
   const [endingActivityId, setEndingActivityId] = useState<number | null>(null)
+  const [editingActivityId, setEditingActivityId] = useState<number | null>(
+    null
+  )
   const [endNotes, setEndNotes] = useState("")
+  const [editNotes, setEditNotes] = useState("")
   const [loadingActivities, setLoadingActivities] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeActivities, setActiveActivities] = useState<
+    model.SessionActivity[]
+  >([])
 
   useEffect(() => {
     loadAvailableActivities()
-  }, [])
+    loadActiveActivities()
+  }, [sessionId])
 
   const loadAvailableActivities = async () => {
     try {
@@ -58,6 +76,15 @@ export function ActivitySection({
     }
   }
 
+  const loadActiveActivities = async () => {
+    try {
+      const data = await GetActiveActivitiesInSession(sessionId)
+      setActiveActivities(data)
+    } catch (err) {
+      console.error("Error loading active activities:", err)
+    }
+  }
+
   const handleStartActivity = async () => {
     if (!selectedActivityId) return
 
@@ -68,6 +95,7 @@ export function ActivitySection({
       setSelectedActivityId(null)
       setActivityNotes("")
       onActivityAdded()
+      loadActiveActivities()
       setError(null)
     } catch (err) {
       console.error("Error starting activity:", err)
@@ -84,10 +112,27 @@ export function ActivitySection({
       setEndingActivityId(null)
       setEndNotes("")
       onActivityAdded()
+      loadActiveActivities()
       setError(null)
     } catch (err) {
       console.error("Error ending activity:", err)
       setError("Gagal mengakhiri aktivitas")
+    } finally {
+      setLoadingActivities(false)
+    }
+  }
+
+  const handleUpdateActivity = async (sessionActivityId: number) => {
+    try {
+      setLoadingActivities(true)
+      await UpdateActivityInSession(sessionActivityId, editNotes)
+      setEditingActivityId(null)
+      setEditNotes("")
+      onActivityAdded()
+      setError(null)
+    } catch (err) {
+      console.error("Error updating activity:", err)
+      setError("Gagal memperbarui catatan aktivitas")
     } finally {
       setLoadingActivities(false)
     }
@@ -115,10 +160,33 @@ export function ActivitySection({
     return activity.EndTime ? "text-green-600" : "text-blue-600"
   }
 
+  const getStatusBadgeColor = (activity: model.SessionActivity) => {
+    return activity.EndTime
+      ? "bg-green-100 text-green-800"
+      : "bg-blue-100 text-blue-800"
+  }
+
+  const startEdit = (activity: model.SessionActivity) => {
+    setEditingActivityId(activity.ID)
+    setEditNotes(activity.Notes || "")
+  }
+
+  const cancelEdit = () => {
+    setEditingActivityId(null)
+    setEditNotes("")
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Aktivitas Sesi</h3>
+        <div>
+          <h3 className="text-lg font-semibold">Aktivitas Sesi</h3>
+          {activeActivities.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {activeActivities.length} aktivitas sedang berlangsung
+            </p>
+          )}
+        </div>
         <button
           className="flex items-center space-x-2 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm"
           onClick={() => setShowAddActivity(true)}
@@ -133,6 +201,28 @@ export function ActivitySection({
         <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
           {error}
         </div>
+      )}
+
+      {/* Active Activities Alert */}
+      {activeActivities.length > 0 && (
+        <Card className="border-l-4 border-l-orange-500 bg-orange-50">
+          <CardContent className="p-3">
+            <div className="flex items-center space-x-2">
+              <Pause size={16} className="text-orange-600" />
+              <span className="text-sm font-medium text-orange-800">
+                Aktivitas Sedang Berlangsung:
+              </span>
+            </div>
+            <div className="mt-2 space-y-1">
+              {activeActivities.map((activity) => (
+                <div key={activity.ID} className="text-sm text-orange-700">
+                  • {activity.Activity?.Name} -{" "}
+                  {formatDuration(activity.StartTime || "")}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {showAddActivity && (
@@ -211,6 +301,7 @@ export function ActivitySection({
       ) : activities.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           <div className="space-y-2">
+            <Clock size={32} className="mx-auto opacity-50" />
             <p>Belum ada aktivitas dalam sesi ini</p>
             <p className="text-sm">Klik "Tambah Aktivitas" untuk memulai</p>
           </div>
@@ -228,15 +319,15 @@ export function ActivitySection({
                     <div className="flex items-center space-x-2 mb-2">
                       <h4 className="font-medium">{activity.Activity?.Name}</h4>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${getStatusColor(
+                        className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeColor(
                           activity
-                        )} bg-opacity-10`}
+                        )}`}
                       >
                         {getActivityStatus(activity)}
                       </span>
                     </div>
 
-                    <div className="text-sm text-muted-foreground space-y-1">
+                    <div className="text-sm text-muted-foreground space-y-1 mb-3">
                       <div className="flex items-center space-x-2">
                         <Clock size={14} />
                         <span>
@@ -262,12 +353,46 @@ export function ActivitySection({
                           ? formatDuration(activity.StartTime, activity.EndTime)
                           : "-"}
                       </div>
-                      {activity.Notes && (
-                        <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                    </div>
+
+                    {/* Notes Section */}
+                    {editingActivityId === activity.ID ? (
+                      <div className="space-y-3 border-t pt-3">
+                        <label className="block text-sm font-medium">
+                          Edit Catatan Aktivitas
+                        </label>
+                        <textarea
+                          value={editNotes}
+                          onChange={(e) => setEditNotes(e.target.value)}
+                          className="w-full border rounded-md p-2 text-sm"
+                          rows={3}
+                          placeholder="Tambahkan atau edit catatan untuk aktivitas ini..."
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleUpdateActivity(activity.ID)}
+                            className="flex items-center space-x-1 bg-green-600 text-white px-3 py-1 rounded text-sm"
+                            disabled={loadingActivities}
+                          >
+                            <CheckCircle size={12} />
+                            <span>Simpan</span>
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="px-3 py-1 border rounded text-sm"
+                            disabled={loadingActivities}
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      activity.Notes && (
+                        <div className="mt-2 p-2 bg-gray-50 rounded text-xs border-t">
                           <strong>Catatan:</strong> {activity.Notes}
                         </div>
-                      )}
-                    </div>
+                      )
+                    )}
                   </div>
 
                   <div className="ml-4">
@@ -304,19 +429,40 @@ export function ActivitySection({
                             </div>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => setEndingActivityId(activity.ID)}
-                            className="flex items-center space-x-1 bg-red-600 text-white px-3 py-1 rounded text-xs"
-                          >
-                            <Square size={12} />
-                            <span>Akhiri</span>
-                          </button>
+                          <div className="flex flex-col space-y-1">
+                            <button
+                              onClick={() => startEdit(activity)}
+                              className="flex items-center space-x-1 bg-blue-600 text-white px-3 py-1 rounded text-xs"
+                              disabled={editingActivityId !== null}
+                            >
+                              <Edit3 size={12} />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => setEndingActivityId(activity.ID)}
+                              className="flex items-center space-x-1 bg-red-600 text-white px-3 py-1 rounded text-xs"
+                            >
+                              <Square size={12} />
+                              <span>Akhiri</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center space-x-1 text-green-600">
-                        <CheckCircle size={16} />
-                        <span className="text-xs">Selesai</span>
+                      <div className="flex flex-col items-center space-y-1">
+                        <div className="flex items-center space-x-1 text-green-600">
+                          <CheckCircle size={16} />
+                          <span className="text-xs">Selesai</span>
+                        </div>
+                        {editingActivityId !== activity.ID && (
+                          <button
+                            onClick={() => startEdit(activity)}
+                            className="flex items-center space-x-1 text-blue-600 hover:bg-blue-50 px-2 py-1 rounded text-xs"
+                          >
+                            <Edit3 size={12} />
+                            <span>Edit Catatan</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
