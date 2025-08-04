@@ -6,10 +6,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Search, Plus, Trash, Edit } from "lucide-react"
+import { Search, Plus, Trash, Edit, List } from "lucide-react"
 import { GetAllChildren, DeleteChild } from "../../../wailsjs/go/main/App"
 import { model } from "../../../wailsjs/go/models"
 import { ChildForm } from "./ChildForm"
+import { ChildSessionActivityHistory } from "./ChildSessionActivityHistory" 
 
 export function ChildrenList() {
   const [children, setChildren] = useState<model.Child[]>([])
@@ -18,6 +19,7 @@ export function ChildrenList() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showAddForm, setShowAddForm] = useState(false)
   const [selectedChild, setSelectedChild] = useState<model.Child | null>(null)
+  const [expandedChildId, setExpandedChildId] = useState<number | null>(null) // 2. State for expanded history
 
   useEffect(() => {
     loadChildren()
@@ -127,33 +129,57 @@ export function ChildrenList() {
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {filteredChildren.map((child) => (
-                <Card key={child.ID}>
-                  <CardContent className="p-4 flex justify-between items-center">
-                    <div>
-                      <h3 className="font-semibold text-lg">{child.Name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {child.Gender} • Orang tua: {child.ParentGuardianName}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Kontak: {child.ContactInfo}
-                      </p>
+                <div key={child.ID}>
+                  <Card>
+                    <CardContent className="p-4 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold text-lg">{child.Name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {child.Gender} • Orang tua: {child.ParentGuardianName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Kontak: {child.ContactInfo}
+                        </p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEditChild(child)}
+                          className="p-2 text-blue-500 hover:bg-blue-50 rounded-full"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteChild(child.ID)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                        >
+                          <Trash size={18} />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setExpandedChildId(
+                              expandedChildId === child.ID ? null : child.ID
+                            )
+                          }
+                          className={`p-2 text-green-600 hover:bg-green-50 rounded-full ${
+                            expandedChildId === child.ID ? "bg-green-100" : ""
+                          }`}
+                          title="Lihat Riwayat Aktivitas"
+                        >
+                          <List size={18} />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  {/* Show history if expanded */}
+                  {expandedChildId === child.ID && (
+                    <div className="mt-2 mb-4">
+                      <ChildSessionActivityHistory
+                        childId={child.ID}
+                        childName={child.Name}
+                      />
                     </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEditChild(child)}
-                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-full"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteChild(child.ID)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                      >
-                        <Trash size={18} />
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  )}
+                </div>
               ))}
             </div>
           )}

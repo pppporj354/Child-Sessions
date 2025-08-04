@@ -46,6 +46,10 @@ export function DeleteNote(arg1) {
   return window['go']['main']['App']['DeleteNote'](arg1);
 }
 
+export function DeleteNoteTemplate(arg1) {
+  return window['go']['main']['App']['DeleteNoteTemplate'](arg1);
+}
+
 export function EndActivityInSession(arg1, arg2) {
   return window['go']['main']['App']['EndActivityInSession'](arg1, arg2);
 }
@@ -114,6 +118,10 @@ export function GetSessionActivities(arg1) {
   return window['go']['main']['App']['GetSessionActivities'](arg1);
 }
 
+export function GetSessionActivityHistoryByChild(arg1) {
+  return window['go']['main']['App']['GetSessionActivityHistoryByChild'](arg1);
+}
+
 export function GetSessionByID(arg1) {
   return window['go']['main']['App']['GetSessionByID'](arg1);
 }
@@ -156,6 +164,10 @@ export function UpdateChild(arg1, arg2, arg3, arg4, arg5, arg6) {
 
 export function UpdateNote(arg1, arg2, arg3) {
   return window['go']['main']['App']['UpdateNote'](arg1, arg2, arg3);
+}
+
+export function UpdateNoteTemplate(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateNoteTemplate'](arg1, arg2, arg3, arg4);
 }
 
 export function UpdateSessionSummaryNotes(arg1, arg2) {

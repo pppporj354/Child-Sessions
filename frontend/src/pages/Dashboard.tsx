@@ -109,9 +109,6 @@ export function Dashboard() {
                         {child.Gender} • {child.ParentGuardianName}
                       </p>
                     </div>
-                    <button className="text-primary hover:underline">
-                      Lihat Detail
-                    </button>
                   </div>
                 ))}
               </div>

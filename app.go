@@ -246,6 +246,11 @@ func (a *App) GetSessionNotes(sessionID uint) ([]model.Note, error) {
 	return notes, nil
 }
 
+// GetSessionActivityHistoryByChild returns all session activities for a child
+func (a *App) GetSessionActivityHistoryByChild(childID uint) ([]model.SessionActivity, error) {
+    return a.sessionService.GetSessionActivityHistoryByChild(childID)
+}
+
 // UpdateNote updates an existing note
 func (a *App) UpdateNote(noteID uint, noteText, category string) (*model.Note, error) {
 	var note model.Note
@@ -275,30 +280,50 @@ func (a *App) DeleteNote(noteID uint) error {
 
 // GetAllNoteTemplates retrieves all available note templates
 func (a *App) GetAllNoteTemplates() ([]model.NoteTemplate, error) {
-	var templates []model.NoteTemplate
-	if err := a.database.Find(&templates).Error; err != nil {
-		return nil, fmt.Errorf("gagal mengambil template catatan: %w", err)
-	}
-	return templates, nil
+    var templates []model.NoteTemplate
+    if err := a.database.Order("created_at DESC").Find(&templates).Error; err != nil {
+        return nil, fmt.Errorf("gagal mengambil template catatan: %w", err)
+    }
+    return templates, nil
 }
 
 // CreateNoteTemplate creates a new note template
 func (a *App) CreateNoteTemplate(templateText, categoryHint, keywords string) (*model.NoteTemplate, error) {
-	if templateText == "" {
-		return nil, fmt.Errorf("teks template harus diisi")
-	}
+    if templateText == "" {
+        return nil, fmt.Errorf("teks template harus diisi")
+    }
+    template := &model.NoteTemplate{
+        TemplateText: templateText,
+        CategoryHint: categoryHint,
+        Keywords:     keywords,
+    }
+    if err := a.database.Create(template).Error; err != nil {
+        return nil, fmt.Errorf("gagal membuat template: %w", err)
+    }
+    return template, nil
+}
 
-	template := &model.NoteTemplate{
-		TemplateText: templateText,
-		CategoryHint: categoryHint,
-		Keywords:     keywords,
-	}
+// UpdateNoteTemplate updates an existing note template
+func (a *App) UpdateNoteTemplate(templateID uint, templateText, categoryHint, keywords string) (*model.NoteTemplate, error) {
+    var template model.NoteTemplate
+    if err := a.database.First(&template, templateID).Error; err != nil {
+        return nil, fmt.Errorf("template tidak ditemukan: %w", err)
+    }
+    template.TemplateText = templateText
+    template.CategoryHint = categoryHint
+    template.Keywords = keywords
+    if err := a.database.Save(&template).Error; err != nil {
+        return nil, fmt.Errorf("gagal memperbarui template: %w", err)
+    }
+    return &template, nil
+}
 
-	if err := a.database.Create(template).Error; err != nil {
-		return nil, fmt.Errorf("gagal membuat template: %w", err)
-	}
-
-	return template, nil
+// DeleteNoteTemplate deletes a note template
+func (a *App) DeleteNoteTemplate(templateID uint) error {
+    if err := a.database.Delete(&model.NoteTemplate{}, templateID).Error; err != nil {
+        return fmt.Errorf("gagal menghapus template: %w", err)
+    }
+    return nil
 }
 
 // ===== REWARD MANAGEMENT =====
@@ -808,3 +833,4 @@ func (a *App) AutoPauseInactiveActivities(sessionID uint, maxDurationMinutes int
 
     return pausedActivities, nil
 }
+

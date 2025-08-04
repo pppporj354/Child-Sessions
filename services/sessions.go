@@ -114,3 +114,18 @@ func (s *SessionService) GetSessionByID(sessionID uint) (*model.Session, error) 
     }
     return &session, nil
 }
+
+func (s *SessionService) GetSessionActivityHistoryByChild(childID uint) ([]model.SessionActivity, error) {
+    var activities []model.SessionActivity
+    err := s.db.
+        Joins("JOIN sessions ON sessions.id = session_activities.session_id").
+        Preload("Activity").
+        Preload("Session").
+        Where("sessions.child_id = ?", childID).
+        Order("sessions.start_time DESC, session_activities.start_time DESC").
+        Find(&activities).Error
+    if err != nil {
+        return nil, fmt.Errorf("gagal mengambil riwayat aktivitas sesi: %w", err)
+    }
+    return activities, nil
+}
