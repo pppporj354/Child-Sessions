@@ -6,7 +6,7 @@ import { Dashboard } from "./pages/Dashboard"
 import { SidebarProvider } from "./components/ui/sidebar"
 import { ChildrenList } from "./pages/children/ChildrenList"
 import { SessionManager } from "./pages/sessions/SessionManager"
-import { ActivityLibrary } from "./pages/activities/ActivityLibrary"
+import { ChildProgressDashboard } from "./pages/children/ChildProgressDashboard"
 import { RewardsSystem } from "./pages/rewards/RewardsSystem"
 import { NotesLibrary } from "./pages/notes/NotesLibrary"
 import { Settings } from "./pages/Settings"
@@ -22,8 +22,8 @@ function App() {
         return <ChildrenList />
       case "sessions":
         return <SessionManager />
-      case "activities":
-        return <ActivityLibrary />
+      case "progress":
+        return <ChildProgressDashboard />
       case "rewards":
         return <RewardsSystem />
       case "notes":

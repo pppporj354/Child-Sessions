@@ -8,6 +8,7 @@ import {
   FileText,
   Settings,
   LayoutDashboard,
+  TrendingUp,
 } from "lucide-react"
 import {
   Sidebar,
@@ -34,6 +35,11 @@ export function AppSidebar({ activePage, setActivePage }: AppSidebarProps) {
     { icon: <Users size={20} />, label: "Anak", value: "children" },
     { icon: <Calendar size={20} />, label: "Sesi", value: "sessions" },
     { icon: <Activity size={20} />, label: "Aktivitas", value: "activities" },
+    {
+      icon: <TrendingUp size={20} />,
+      label: "Progres Anak",
+      value: "progress",
+    },
     { icon: <Award size={20} />, label: "Rewards", value: "rewards" },
     { icon: <FileText size={20} />, label: "Catatan", value: "notes" },
     { icon: <Settings size={20} />, label: "Pengaturan", value: "settings" },
