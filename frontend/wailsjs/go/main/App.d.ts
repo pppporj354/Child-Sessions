@@ -44,11 +44,17 @@ export function GetAllChildren():Promise<Array<model.Child>>;
 
 export function GetAllNoteTemplates():Promise<Array<model.NoteTemplate>>;
 
+export function GetChildActivityFrequency(arg1:number):Promise<Record<string, number>>;
+
 export function GetChildByID(arg1:number):Promise<model.Child>;
 
 export function GetChildGoals(arg1:number):Promise<Array<model.Goal>>;
 
+export function GetChildNoteKeywordFrequency(arg1:number):Promise<Record<string, number>>;
+
 export function GetChildProgressSummary(arg1:number):Promise<Record<string, any>>;
+
+export function GetChildRewardTrends(arg1:number):Promise<Array<Record<string, any>>>;
 
 export function GetChildRewards(arg1:number):Promise<Array<model.Reward>>;
 

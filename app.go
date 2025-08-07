@@ -834,3 +834,84 @@ func (a *App) AutoPauseInactiveActivities(sessionID uint, maxDurationMinutes int
     return pausedActivities, nil
 }
 
+// GetChildActivityFrequency returns the most frequent activities for a child
+func (a *App) GetChildActivityFrequency(childID uint) (map[string]int, error) {
+    var results []struct {
+        Name  string
+        Count int
+    }
+    err := a.database.
+        Table("session_activities").
+        Select("activities.name as name, COUNT(*) as count").
+        Joins("JOIN activities ON activities.id = session_activities.activity_id").
+        Joins("JOIN sessions ON sessions.id = session_activities.session_id").
+        Where("sessions.child_id = ?", childID).
+        Group("activities.name").
+        Order("count DESC").
+        Scan(&results).Error
+    if err != nil {
+        return nil, err
+    }
+    freq := make(map[string]int)
+    for _, r := range results {
+        freq[r.Name] = r.Count
+    }
+    return freq, nil
+}
+
+// GetChildNoteKeywordFrequency returns keyword frequency in notes for a child
+func (a *App) GetChildNoteKeywordFrequency(childID uint) (map[string]int, error) {
+    var notes []string
+    err := a.database.
+        Table("notes").
+        Select("note_text").
+        Joins("JOIN sessions ON sessions.id = notes.session_id").
+        Where("sessions.child_id = ?", childID).
+        Scan(&notes).Error
+    if err != nil {
+        return nil, err
+    }
+    // Simple word frequency (split by space, ignore case, remove punctuation)
+    freq := make(map[string]int)
+    for _, note := range notes {
+        words := strings.FieldsFunc(strings.ToLower(note), func(r rune) bool {
+            return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+        })
+        for _, w := range words {
+            if len(w) > 2 { // ignore very short words
+                freq[w]++
+            }
+        }
+    }
+    return freq, nil
+}
+
+// GetChildRewardTrends returns reward counts per month for a child
+func (a *App) GetChildRewardTrends(childID uint) ([]map[string]interface{}, error) {
+    rows, err := a.database.
+        Table("rewards").
+        Select("strftime('%Y-%m', timestamp) as month, type, SUM(value) as total").
+        Where("child_id = ?", childID).
+        Group("month, type").
+        Order("month ASC").
+        Rows()
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    var trends []map[string]interface{}
+    for rows.Next() {
+        var month, rewardType string
+        var total int
+        if err := rows.Scan(&month, &rewardType, &total); err != nil {
+            continue
+        }
+        trends = append(trends, map[string]interface{}{
+            "month": month,
+            "type":  rewardType,
+            "total": total,
+        })
+    }
+    return trends, nil
+}
+

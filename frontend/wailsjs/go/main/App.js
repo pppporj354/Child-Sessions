@@ -86,6 +86,10 @@ export function GetAllNoteTemplates() {
   return window['go']['main']['App']['GetAllNoteTemplates']();
 }
 
+export function GetChildActivityFrequency(arg1) {
+  return window['go']['main']['App']['GetChildActivityFrequency'](arg1);
+}
+
 export function GetChildByID(arg1) {
   return window['go']['main']['App']['GetChildByID'](arg1);
 }
@@ -94,8 +98,16 @@ export function GetChildGoals(arg1) {
   return window['go']['main']['App']['GetChildGoals'](arg1);
 }
 
+export function GetChildNoteKeywordFrequency(arg1) {
+  return window['go']['main']['App']['GetChildNoteKeywordFrequency'](arg1);
+}
+
 export function GetChildProgressSummary(arg1) {
   return window['go']['main']['App']['GetChildProgressSummary'](arg1);
+}
+
+export function GetChildRewardTrends(arg1) {
+  return window['go']['main']['App']['GetChildRewardTrends'](arg1);
 }
 
 export function GetChildRewards(arg1) {
