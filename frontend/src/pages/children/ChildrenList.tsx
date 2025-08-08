@@ -10,7 +10,7 @@ import { Search, Plus, Trash, Edit, List } from "lucide-react"
 import { GetAllChildren, DeleteChild } from "../../../wailsjs/go/main/App"
 import { model } from "../../../wailsjs/go/models"
 import { ChildForm } from "./ChildForm"
-import { ChildSessionActivityHistory } from "./ChildSessionActivityHistory" 
+import { ChildSessionActivityHistory } from "./ChildSessionActivityHistory"
 
 export function ChildrenList() {
   const [children, setChildren] = useState<model.Child[]>([])

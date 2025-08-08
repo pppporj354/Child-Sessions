@@ -152,6 +152,7 @@ This is a **therapist's toolkit for child sessions** with planned features:
 - https://wails.io/docs/reference/menus
 - https://wails.io/docs/reference/project-config
 - https://pkg.go.dev/gorm.io/gorm@v1.30.1#pkg-index
+- https://pkg.go.dev/github.com/wailsapp/wails/v2@v2.10.2/pkg/runtime
 
 ### Additional Resources
 

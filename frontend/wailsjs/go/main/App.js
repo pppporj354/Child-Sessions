@@ -58,6 +58,14 @@ export function EndSession(arg1, arg2) {
   return window['go']['main']['App']['EndSession'](arg1, arg2);
 }
 
+export function ExportCSVFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportCSVFile'](arg1, arg2, arg3);
+}
+
+export function ExportPDFFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportPDFFile'](arg1, arg2, arg3);
+}
+
 export function GenerateSessionSummary(arg1) {
   return window['go']['main']['App']['GenerateSessionSummary'](arg1);
 }
@@ -156,6 +164,18 @@ export function Greet(arg1) {
 
 export function LogFlashcardResponse(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['LogFlashcardResponse'](arg1, arg2, arg3, arg4);
+}
+
+export function OpenFileInExplorer(arg1, arg2) {
+  return window['go']['main']['App']['OpenFileInExplorer'](arg1, arg2);
+}
+
+export function ShowErrorNotification(arg1, arg2) {
+  return window['go']['main']['App']['ShowErrorNotification'](arg1, arg2);
+}
+
+export function ShowNotification(arg1, arg2) {
+  return window['go']['main']['App']['ShowNotification'](arg1, arg2);
 }
 
 export function StartActivityInSession(arg1, arg2, arg3) {

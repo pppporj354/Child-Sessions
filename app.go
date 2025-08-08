@@ -6,9 +6,14 @@ import (
 	"childSessions/services"
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+
 	"strings"
 	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"gorm.io/gorm"
 )
 
@@ -913,5 +918,146 @@ func (a *App) GetChildRewardTrends(childID uint) ([]map[string]interface{}, erro
         })
     }
     return trends, nil
+}
+
+// ExportCSVFile exports CSV data to a file using Wails file dialog
+func (a *App) ExportCSVFile(ctx context.Context, csvData string, defaultFilename string) (string, error) {
+    // Get user's Downloads directory
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return "", fmt.Errorf("gagal mendapatkan direktori home: %w", err)
+    }
+    
+    downloadsDir := filepath.Join(homeDir, "Downloads")
+
+
+    // Open save dialog
+    filePath, err := runtime.SaveFileDialog(ctx, runtime.SaveDialogOptions{
+        Title:           "Simpan File CSV",
+        DefaultFilename: defaultFilename,
+        DefaultDirectory: downloadsDir,
+        Filters: []runtime.FileFilter{
+            {
+                DisplayName: "CSV Files (*.csv)",
+                Pattern:     "*.csv",
+            },
+        },
+    })
+
+    if err != nil {
+        return "", fmt.Errorf("dialog dibatalkan atau gagal: %w", err)
+    }
+
+    if filePath == "" {
+        return "", fmt.Errorf("tidak ada file yang dipilih")
+    }
+
+    // Write CSV data to file
+    err = os.WriteFile(filePath, []byte(csvData), 0644)
+    if err != nil {
+        return "", fmt.Errorf("gagal menulis file: %w", err)
+    }
+
+    return filePath, nil
+}
+
+// ExportPDFFile exports PDF data to a file using Wails file dialog
+func (a *App) ExportPDFFile(ctx context.Context, pdfData []byte, defaultFilename string) (string, error) {
+    // Get user's Downloads directory
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return "", fmt.Errorf("gagal mendapatkan direktori home: %w", err)
+    }
+    
+    downloadsDir := filepath.Join(homeDir, "Downloads")
+
+    // Open save dialog
+    filePath, err := runtime.SaveFileDialog(ctx, runtime.SaveDialogOptions{
+        Title:           "Simpan File PDF",
+        DefaultFilename: defaultFilename,
+        DefaultDirectory: downloadsDir,
+        Filters: []runtime.FileFilter{
+            {
+                DisplayName: "PDF Files (*.pdf)",
+                Pattern:     "*.pdf",
+            },
+        },
+    })
+
+    if err != nil {
+        return "", fmt.Errorf("dialog dibatalkan atau gagal: %w", err)
+    }
+
+    if filePath == "" {
+        return "", fmt.Errorf("tidak ada file yang dipilih")
+    }
+
+    // Write PDF data to file
+    err = os.WriteFile(filePath, pdfData, 0644)
+    if err != nil {
+        return "", fmt.Errorf("gagal menulis file: %w", err)
+    }
+
+    return filePath, nil
+}
+
+// OpenFileInExplorer opens the file in system file explorer
+func (a *App) OpenFileInExplorer(ctx context.Context, filePath string) error {
+    var cmd string
+    var args []string
+
+    // Use Wails runtime to get platform name
+    platform := runtime.Environment(ctx).Platform
+
+    switch platform {
+    case "windows":
+        cmd = "explorer"
+        args = []string{"/select,", filePath}
+    case "darwin":
+        cmd = "open"
+        args = []string{"-R", filePath}
+    case "linux":
+        // Try different file managers
+        if _, err := os.Stat("/usr/bin/nautilus"); err == nil {
+            cmd = "nautilus"
+            args = []string{"--select", filePath}
+        } else if _, err := os.Stat("/usr/bin/dolphin"); err == nil {
+            cmd = "dolphin"
+            args = []string{"--select", filePath}
+        } else {
+            // Fallback: open directory
+            cmd = "xdg-open"
+            args = []string{filepath.Dir(filePath)}
+        }
+    default:
+        return fmt.Errorf("platform tidak didukung")
+    }
+ 
+    execCmd := exec.Command(cmd, args...)
+    if err := execCmd.Start(); err != nil {
+        return fmt.Errorf("gagal membuka file di explorer: %w", err)
+    }
+
+    return nil
+    
+}
+
+// ShowNotification shows a system notification and emits an event to frontend
+func (a *App) ShowNotification(title, message string) {
+    // Emit notification event to frontend
+    runtime.EventsEmit(a.ctx, "notification", map[string]interface{}{
+        "title":   title,
+        "message": message,
+        "type":    "success",
+    })
+}
+
+// ShowErrorNotification shows an error notification
+func (a *App) ShowErrorNotification(title, message string) {
+    runtime.EventsEmit(a.ctx, "notification", map[string]interface{}{
+        "title":   title,
+        "message": message,
+        "type":    "error",
+    })
 }
 

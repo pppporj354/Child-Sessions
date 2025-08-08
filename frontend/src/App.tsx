@@ -10,6 +10,7 @@ import { ChildProgressDashboard } from "./pages/children/ChildProgressDashboard"
 import { RewardsSystem } from "./pages/rewards/RewardsSystem"
 import { NotesLibrary } from "./pages/notes/NotesLibrary"
 import { Settings } from "./pages/Settings"
+import { Toaster } from "./components/ui/sonner"
 
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
@@ -44,6 +45,7 @@ function App() {
         header={<Header pageTitle={getPageTitle(activePage)} />}
       >
         {renderPage()}
+        <Toaster />
       </AppLayout>
     </SidebarProvider>
   )
@@ -59,6 +61,8 @@ function getPageTitle(page: string): string {
       return "Sesi Terapi"
     case "activities":
       return "Aktivitas"
+    case "progress":
+      return "Progres Anak"
     case "rewards":
       return "Sistem Reward"
     case "notes":
