@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	sysruntime "runtime"
 	"strings"
 	"time"
 
@@ -921,7 +922,7 @@ func (a *App) GetChildRewardTrends(childID uint) ([]map[string]interface{}, erro
 }
 
 // ExportCSVFile exports CSV data to a file using Wails file dialog
-func (a *App) ExportCSVFile(ctx context.Context, csvData string, defaultFilename string) (string, error) {
+func (a *App) ExportCSVFile(csvData string, defaultFilename string) (string, error) {
     // Get user's Downloads directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
@@ -930,9 +931,8 @@ func (a *App) ExportCSVFile(ctx context.Context, csvData string, defaultFilename
     
     downloadsDir := filepath.Join(homeDir, "Downloads")
 
-
     // Open save dialog
-    filePath, err := runtime.SaveFileDialog(ctx, runtime.SaveDialogOptions{
+    filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
         Title:           "Simpan File CSV",
         DefaultFilename: defaultFilename,
         DefaultDirectory: downloadsDir,
@@ -962,7 +962,7 @@ func (a *App) ExportCSVFile(ctx context.Context, csvData string, defaultFilename
 }
 
 // ExportPDFFile exports PDF data to a file using Wails file dialog
-func (a *App) ExportPDFFile(ctx context.Context, pdfData []byte, defaultFilename string) (string, error) {
+func (a *App) ExportPDFFile(pdfData []byte, defaultFilename string) (string, error) {
     // Get user's Downloads directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
@@ -972,7 +972,7 @@ func (a *App) ExportPDFFile(ctx context.Context, pdfData []byte, defaultFilename
     downloadsDir := filepath.Join(homeDir, "Downloads")
 
     // Open save dialog
-    filePath, err := runtime.SaveFileDialog(ctx, runtime.SaveDialogOptions{
+    filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
         Title:           "Simpan File PDF",
         DefaultFilename: defaultFilename,
         DefaultDirectory: downloadsDir,
@@ -1002,14 +1002,11 @@ func (a *App) ExportPDFFile(ctx context.Context, pdfData []byte, defaultFilename
 }
 
 // OpenFileInExplorer opens the file in system file explorer
-func (a *App) OpenFileInExplorer(ctx context.Context, filePath string) error {
+func (a *App) OpenFileInExplorer(filePath string) error {
     var cmd string
     var args []string
 
-    // Use Wails runtime to get platform name
-    platform := runtime.Environment(ctx).Platform
-
-    switch platform {
+    switch sysruntime.GOOS {
     case "windows":
         cmd = "explorer"
         args = []string{"/select,", filePath}
@@ -1032,24 +1029,20 @@ func (a *App) OpenFileInExplorer(ctx context.Context, filePath string) error {
     default:
         return fmt.Errorf("platform tidak didukung")
     }
- 
-    execCmd := exec.Command(cmd, args...)
-    if err := execCmd.Start(); err != nil {
-        return fmt.Errorf("gagal membuka file di explorer: %w", err)
-    }
 
-    return nil
-    
+    exec := exec.Command(cmd, args...)
+    return exec.Start()
 }
 
 // ShowNotification shows a system notification and emits an event to frontend
-func (a *App) ShowNotification(title, message string) {
+func (a *App) ShowNotification(title, message string) error {
     // Emit notification event to frontend
     runtime.EventsEmit(a.ctx, "notification", map[string]interface{}{
         "title":   title,
         "message": message,
         "type":    "success",
     })
+    return nil
 }
 
 // ShowErrorNotification shows an error notification

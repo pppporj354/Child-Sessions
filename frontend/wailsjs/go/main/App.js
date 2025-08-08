@@ -58,12 +58,12 @@ export function EndSession(arg1, arg2) {
   return window['go']['main']['App']['EndSession'](arg1, arg2);
 }
 
-export function ExportCSVFile(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ExportCSVFile'](arg1, arg2, arg3);
+export function ExportCSVFile(arg1, arg2) {
+  return window['go']['main']['App']['ExportCSVFile'](arg1, arg2);
 }
 
-export function ExportPDFFile(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ExportPDFFile'](arg1, arg2, arg3);
+export function ExportPDFFile(arg1, arg2) {
+  return window['go']['main']['App']['ExportPDFFile'](arg1, arg2);
 }
 
 export function GenerateSessionSummary(arg1) {
@@ -166,8 +166,8 @@ export function LogFlashcardResponse(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['LogFlashcardResponse'](arg1, arg2, arg3, arg4);
 }
 
-export function OpenFileInExplorer(arg1, arg2) {
-  return window['go']['main']['App']['OpenFileInExplorer'](arg1, arg2);
+export function OpenFileInExplorer(arg1) {
+  return window['go']['main']['App']['OpenFileInExplorer'](arg1);
 }
 
 export function ShowErrorNotification(arg1, arg2) {

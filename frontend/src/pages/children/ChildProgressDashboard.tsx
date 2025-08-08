@@ -265,25 +265,111 @@ export function ChildProgressDashboard() {
         throw new Error("Dashboard element tidak ditemukan")
       }
 
-      // Capture dashboard as canvas
+      // Create temporary CSS to override oklch colors for html2canvas
+      const tempStyleElement = document.createElement("style")
+      tempStyleElement.textContent = `
+      #progress-dashboard-export * {
+        background-color: white !important;
+        color: black !important;
+        border-color: #e5e7eb !important;
+      }
+      #progress-dashboard-export .bg-blue-50 {
+        background-color: #eff6ff !important;
+      }
+      #progress-dashboard-export .bg-green-50 {
+        background-color: #f0fdf4 !important;
+      }
+      #progress-dashboard-export .bg-orange-50 {
+        background-color: #fff7ed !important;
+      }
+      #progress-dashboard-export .bg-purple-50 {
+        background-color: #faf5ff !important;
+      }
+      #progress-dashboard-export .bg-yellow-50 {
+        background-color: #fefce8 !important;
+      }
+      #progress-dashboard-export .bg-red-50 {
+        background-color: #fef2f2 !important;
+      }
+      #progress-dashboard-export .text-blue-600 {
+        color: #2563eb !important;
+      }
+      #progress-dashboard-export .text-green-600 {
+        color: #16a34a !important;
+      }
+      #progress-dashboard-export .text-purple-600 {
+        color: #9333ea !important;
+      }
+      #progress-dashboard-export .text-yellow-600 {
+        color: #ca8a04 !important;
+      }
+      #progress-dashboard-export .text-blue-700 {
+        color: #1d4ed8 !important;
+      }
+      #progress-dashboard-export .text-green-700 {
+        color: #15803d !important;
+      }
+      #progress-dashboard-export .text-orange-700 {
+        color: #c2410c !important;
+      }
+      #progress-dashboard-export .text-purple-700 {
+        color: #7c3aed !important;
+      }
+      #progress-dashboard-export .text-yellow-700 {
+        color: #a16207 !important;
+      }
+      #progress-dashboard-export .text-muted-foreground {
+        color: #6b7280 !important;
+      }
+      #progress-dashboard-export .border {
+        border-color: #e5e7eb !important;
+      }
+      #progress-dashboard-export .shadow-lg {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+      }
+    `
+
+      // Add temporary styles to document
+      document.head.appendChild(tempStyleElement)
+
+      // Wait a moment for styles to apply
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      // Capture dashboard as canvas with specific options for better compatibility
       const canvas = await html2canvas(dashboard, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
         width: dashboard.scrollWidth,
         height: dashboard.scrollHeight,
+        removeContainer: true,
+        foreignObjectRendering: false,
+        imageTimeout: 15000,
+        logging: false,
       })
 
-      const imgData = canvas.toDataURL("image/png")
+      // Remove temporary styles
+      document.head.removeChild(tempStyleElement)
+
+      const imgData = canvas.toDataURL("image/png", 1.0)
       const pdf = new jsPDF("p", "mm", "a4")
 
-      // Calculate dimensions to fit A4
+      // Calculate dimensions to fit A4 properly
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
       const imageWidth = canvas.width
       const imageHeight = canvas.height
-      const ratio = Math.min(pageWidth / imageWidth, pageHeight / imageHeight)
+
+      // Calculate ratio to fit the page with some margin
+      const margin = 10
+      const availableWidth = pageWidth - margin * 2
+      const availableHeight = pageHeight - margin * 2
+
+      const ratio = Math.min(
+        availableWidth / imageWidth,
+        availableHeight / imageHeight
+      )
       const finalWidth = imageWidth * ratio
       const finalHeight = imageHeight * ratio
 
@@ -291,28 +377,44 @@ export function ChildProgressDashboard() {
       const xOffset = (pageWidth - finalWidth) / 2
       const yOffset = (pageHeight - finalHeight) / 2
 
-      pdf.addImage(imgData, "PNG", xOffset, yOffset, finalWidth, finalHeight)
+      // Add title to PDF
+      pdf.setFontSize(16)
+      pdf.text(`Progres Terapi - ${selectedChild.Name}`, margin, margin)
+      pdf.setFontSize(10)
+      pdf.text(
+        `Digenerated pada: ${new Date().toLocaleDateString("id-ID")}`,
+        margin,
+        margin + 6
+      )
+
+      // Add the image with some top margin for the title
+      pdf.addImage(
+        imgData,
+        "PNG",
+        xOffset,
+        yOffset + 10,
+        finalWidth,
+        finalHeight - 10
+      )
 
       // Convert PDF to bytes
       const pdfBytes = pdf.output("arraybuffer")
       const uint8Array = new Uint8Array(pdfBytes)
 
-      // Use Wails export function
-      const filename = `progres_${selectedChild.Name}_${
-        new Date().toISOString().split("T")[0]
-      }.pdf`
-      const savedPath = await ExportPDFFile(
-        null,
-        Array.from(uint8Array),
-        filename
-      )
+      // Use Wails export function with context parameter
+      const filename = `progres_${selectedChild.Name.replace(
+        /[^a-zA-Z0-9]/g,
+        "_"
+      )}_${new Date().toISOString().split("T")[0]}.pdf`
+
+      const savedPath = await ExportPDFFile(Array.from(uint8Array), filename)
 
       toast.dismiss()
       toast.success("PDF Berhasil Diekspor!", {
         description: `File disimpan di: ${savedPath}`,
         action: {
           label: "Buka Folder",
-          onClick: () => OpenFileInExplorer(null, savedPath),
+          onClick: () => OpenFileInExplorer(savedPath),
         },
       })
 
@@ -325,7 +427,11 @@ export function ChildProgressDashboard() {
       console.error("Error exporting PDF:", err)
       toast.dismiss()
       toast.error("Gagal Ekspor PDF", {
-        description: "Terjadi kesalahan saat membuat PDF",
+        description: `Terjadi kesalahan: ${
+          typeof err === "object" && err !== null && "message" in err
+            ? (err as { message?: string }).message
+            : "Unknown error"
+        }`,
       })
     } finally {
       setExportingPDF(false)
@@ -342,115 +448,193 @@ export function ChildProgressDashboard() {
 
     try {
       setExportingCSV(true)
-      toast.loading("Membuat CSV...", {
+      const loadingToastId = toast.loading("Membuat CSV...", {
         description: "Mengumpulkan data sesi",
       })
 
-      // Prepare comprehensive CSV data
+      // Prepare comprehensive CSV data with explicit structure
       const csvData = []
 
-      // Add session data
-      sessions.forEach((session) => {
-        const duration = session.EndTime
-          ? Math.round(
-              (new Date(session.EndTime).getTime() -
-                new Date(session.StartTime).getTime()) /
-                60000
-            )
-          : ""
+      // Add session data with proper error handling
+      if (sessions && Array.isArray(sessions) && sessions.length > 0) {
+        sessions.forEach((session, index) => {
+          try {
+            const startTime = new Date(session.StartTime)
+            const endTime = session.EndTime ? new Date(session.EndTime) : null
+            const duration = endTime
+              ? Math.round((endTime.getTime() - startTime.getTime()) / 60000)
+              : ""
 
-        csvData.push({
-          tipe: "SESI",
-          tanggal: new Date(session.StartTime).toLocaleDateString("id-ID"),
-          waktu_mulai: new Date(session.StartTime).toLocaleTimeString("id-ID"),
-          waktu_selesai: session.EndTime
-            ? new Date(session.EndTime).toLocaleTimeString("id-ID")
-            : "",
-          durasi_menit: duration,
-          kategori: "",
-          deskripsi: session.SummaryNotes || "",
-          nilai: "",
-        })
-      })
-
-      // Add reward data
-      rewards.forEach((reward) => {
-        csvData.push({
-          tipe: "REWARD",
-          tanggal: new Date(reward.Timestamp).toLocaleDateString("id-ID"),
-          waktu_mulai: new Date(reward.Timestamp).toLocaleTimeString("id-ID"),
-          waktu_selesai: "",
-          durasi_menit: "",
-          kategori: reward.Type,
-          deskripsi: reward.Notes || "",
-          nilai: reward.Value,
-        })
-      })
-
-      // Add activity frequency data
-      activityFreq.forEach((activity) => {
-        csvData.push({
-          tipe: "AKTIVITAS",
-          tanggal: "",
-          waktu_mulai: "",
-          waktu_selesai: "",
-          durasi_menit: "",
-          kategori: activity.name,
-          deskripsi: `Frekuensi aktivitas`,
-          nilai: activity.count,
-        })
-      })
-
-      // Add summary data
-      if (progress) {
-        csvData.push({
-          tipe: "RINGKASAN",
-          tanggal: new Date().toLocaleDateString("id-ID"),
-          waktu_mulai: "",
-          waktu_selesai: "",
-          durasi_menit: "",
-          kategori: "Total Sesi",
-          deskripsi: "Jumlah total sesi",
-          nilai: progress.total_sessions,
-        })
-
-        csvData.push({
-          tipe: "RINGKASAN",
-          tanggal: new Date().toLocaleDateString("id-ID"),
-          waktu_mulai: "",
-          waktu_selesai: "",
-          durasi_menit: "",
-          kategori: "Sesi Selesai",
-          deskripsi: "Jumlah sesi yang diselesaikan",
-          nilai: progress.completed_sessions,
-        })
-
-        csvData.push({
-          tipe: "RINGKASAN",
-          tanggal: new Date().toLocaleDateString("id-ID"),
-          waktu_mulai: "",
-          waktu_selesai: "",
-          durasi_menit: "",
-          kategori: "Rata-rata Durasi",
-          deskripsi: "Rata-rata durasi sesi (menit)",
-          nilai: Math.round(progress.avg_duration || 0),
+            csvData.push({
+              no: index + 1,
+              tipe: "SESI",
+              tanggal: startTime.toLocaleDateString("id-ID"),
+              waktu_mulai: startTime.toLocaleTimeString("id-ID"),
+              waktu_selesai: endTime ? endTime.toLocaleTimeString("id-ID") : "",
+              durasi_menit: duration,
+              kategori: "Sesi Terapi",
+              deskripsi: session.SummaryNotes || "Tidak ada catatan",
+              nilai: "",
+              id_referensi: session.ID || "",
+            })
+          } catch (sessionError) {
+            console.error("Error processing session:", sessionError)
+          }
         })
       }
 
-      const csv = Papa.unparse(csvData)
-      const filename = `data_${selectedChild.Name}_${
+      // Add reward data with proper error handling
+      if (rewards && Array.isArray(rewards) && rewards.length > 0) {
+        rewards.forEach((reward, index) => {
+          try {
+            const rewardTime = new Date(reward.Timestamp)
+            csvData.push({
+              no: sessions.length + index + 1,
+              tipe: "REWARD",
+              tanggal: rewardTime.toLocaleDateString("id-ID"),
+              waktu_mulai: rewardTime.toLocaleTimeString("id-ID"),
+              waktu_selesai: "",
+              durasi_menit: "",
+              kategori: reward.Type || "Unknown",
+              deskripsi: reward.Notes || "Tidak ada catatan",
+              nilai: reward.Value || 0,
+              id_referensi: reward.ID || "",
+            })
+          } catch (rewardError) {
+            console.error("Error processing reward:", rewardError)
+          }
+        })
+      }
+
+      // Add activity frequency data with proper error handling
+      if (
+        activityFreq &&
+        Array.isArray(activityFreq) &&
+        activityFreq.length > 0
+      ) {
+        activityFreq.forEach((activity, index) => {
+          try {
+            csvData.push({
+              no: sessions.length + rewards.length + index + 1,
+              tipe: "AKTIVITAS",
+              tanggal: new Date().toLocaleDateString("id-ID"),
+              waktu_mulai: "",
+              waktu_selesai: "",
+              durasi_menit: "",
+              kategori: activity.name || "Unknown Activity",
+              deskripsi: `Frekuensi aktivitas yang dilakukan`,
+              nilai: activity.count || 0,
+              id_referensi: "",
+            })
+          } catch (activityError) {
+            console.error("Error processing activity:", activityError)
+          }
+        })
+      }
+
+      // Add summary data with proper error handling
+      if (progress) {
+        try {
+          const summaryStartIndex =
+            sessions.length + rewards.length + activityFreq.length
+
+          csvData.push({
+            no: summaryStartIndex + 1,
+            tipe: "RINGKASAN",
+            tanggal: new Date().toLocaleDateString("id-ID"),
+            waktu_mulai: "",
+            waktu_selesai: "",
+            durasi_menit: "",
+            kategori: "Total Sesi",
+            deskripsi: "Jumlah total sesi yang pernah dilakukan",
+            nilai: progress.total_sessions || 0,
+            id_referensi: "",
+          })
+
+          csvData.push({
+            no: summaryStartIndex + 2,
+            tipe: "RINGKASAN",
+            tanggal: new Date().toLocaleDateString("id-ID"),
+            waktu_mulai: "",
+            waktu_selesai: "",
+            durasi_menit: "",
+            kategori: "Sesi Selesai",
+            deskripsi: "Jumlah sesi yang berhasil diselesaikan",
+            nilai: progress.completed_sessions || 0,
+            id_referensi: "",
+          })
+
+          csvData.push({
+            no: summaryStartIndex + 3,
+            tipe: "RINGKASAN",
+            tanggal: new Date().toLocaleDateString("id-ID"),
+            waktu_mulai: "",
+            waktu_selesai: "",
+            durasi_menit: "",
+            kategori: "Rata-rata Durasi",
+            deskripsi: "Rata-rata durasi sesi dalam menit",
+            nilai: Math.round(progress.avg_duration || 0),
+            id_referensi: "",
+          })
+
+          csvData.push({
+            no: summaryStartIndex + 4,
+            tipe: "RINGKASAN",
+            tanggal: new Date().toLocaleDateString("id-ID"),
+            waktu_mulai: "",
+            waktu_selesai: "",
+            durasi_menit: "",
+            kategori: "Total Reward",
+            deskripsi: "Total reward yang diberikan",
+            nilai: progress.reward_summary?.total_rewards || 0,
+            id_referensi: "",
+          })
+        } catch (summaryError) {
+          console.error("Error processing summary:", summaryError)
+        }
+      }
+
+      // If no data, add a placeholder row
+      if (csvData.length === 0) {
+        csvData.push({
+          no: 1,
+          tipe: "INFO",
+          tanggal: new Date().toLocaleDateString("id-ID"),
+          waktu_mulai: "",
+          waktu_selesai: "",
+          durasi_menit: "",
+          kategori: "Tidak Ada Data",
+          deskripsi: "Belum ada data untuk anak ini",
+          nilai: "",
+          id_referensi: "",
+        })
+      }
+
+      // Generate CSV with proper configuration
+      const csv = Papa.unparse(csvData, {
+        header: true,
+        delimiter: ",",
+        skipEmptyLines: true,
+      })
+
+      // Create a clean filename
+      const cleanChildName = selectedChild.Name.replace(/[^a-zA-Z0-9]/g, "_")
+      const filename = `data_${cleanChildName}_${
         new Date().toISOString().split("T")[0]
       }.csv`
 
       // Use Wails export function
-      const savedPath = await ExportCSVFile(null, csv, filename)
+      const savedPath = await ExportCSVFile(csv, filename)
 
-      toast.dismiss()
+      // Dismiss loading toast
+      toast.dismiss(loadingToastId)
+
+      // Show success toast
       toast.success("CSV Berhasil Diekspor!", {
         description: `File disimpan di: ${savedPath}`,
         action: {
           label: "Buka Folder",
-          onClick: () => OpenFileInExplorer(null, savedPath),
+          onClick: () => OpenFileInExplorer(savedPath),
         },
       })
 
@@ -461,9 +645,13 @@ export function ChildProgressDashboard() {
       )
     } catch (err) {
       console.error("Error exporting CSV:", err)
-      toast.dismiss()
+      toast.dismiss() // Dismiss any existing toasts
       toast.error("Gagal Ekspor CSV", {
-        description: "Terjadi kesalahan saat membuat CSV",
+        description: `Terjadi kesalahan: ${
+          typeof err === "object" && err !== null && "message" in err
+            ? (err as { message?: string }).message
+            : "Unknown error"
+        }`,
       })
     } finally {
       setExportingCSV(false)
