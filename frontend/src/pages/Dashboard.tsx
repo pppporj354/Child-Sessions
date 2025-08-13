@@ -44,107 +44,163 @@ export function Dashboard() {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
   const [refreshInterval, setRefreshInterval] = useState(30) // seconds
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [refreshFailureCount, setRefreshFailureCount] = useState(0)
 
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
+  const eventUnsubscribers = useRef<Array<() => void>>([])
 
   useEffect(() => {
     loadInitialData()
 
-    // Listen for session events from backend
-    const unsubscribeSessionStart = EventsOn(
-      "session_started",
-      handleSessionEvent
-    )
-    const unsubscribeSessionEnd = EventsOn("session_ended", handleSessionEvent)
-    const unsubscribeChildAdded = EventsOn("child_added", handleChildEvent)
+    // Listen for session events from backend with proper cleanup tracking
+    try {
+      const unsubscribeSessionStart = EventsOn(
+        "session_started",
+        handleSessionEvent
+      )
+      const unsubscribeSessionEnd = EventsOn(
+        "session_ended",
+        handleSessionEvent
+      )
+      const unsubscribeChildAdded = EventsOn("child_added", handleChildEvent)
+
+      // Store unsubscribers for proper cleanup
+      if (unsubscribeSessionStart)
+        eventUnsubscribers.current.push(unsubscribeSessionStart)
+      if (unsubscribeSessionEnd)
+        eventUnsubscribers.current.push(unsubscribeSessionEnd)
+      if (unsubscribeChildAdded)
+        eventUnsubscribers.current.push(unsubscribeChildAdded)
+    } catch (err) {
+      console.error("Error setting up event listeners:", err)
+    }
 
     // Cleanup on unmount
     return () => {
       mountedRef.current = false
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current)
-      }
-      if (unsubscribeSessionStart) unsubscribeSessionStart()
-      if (unsubscribeSessionEnd) unsubscribeSessionEnd()
-      if (unsubscribeChildAdded) unsubscribeChildAdded()
+      clearRefreshTimer()
+      cleanupEventListeners()
     }
   }, [])
 
-  // Auto-refresh setup
+  // Auto-refresh setup with better error handling
   useEffect(() => {
-    if (autoRefreshEnabled && refreshInterval > 0) {
+    clearRefreshTimer()
+
+    if (autoRefreshEnabled && refreshInterval > 0 && mountedRef.current) {
       refreshTimerRef.current = setInterval(() => {
-        if (mountedRef.current) {
+        if (mountedRef.current && !statsLoading) {
           handleAutoRefresh()
         }
       }, refreshInterval * 1000)
-    } else {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current)
-        refreshTimerRef.current = null
+    }
+
+    return () => clearRefreshTimer()
+  }, [autoRefreshEnabled, refreshInterval, statsLoading])
+
+  const clearRefreshTimer = () => {
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+  }
+
+  const cleanupEventListeners = () => {
+    eventUnsubscribers.current.forEach((unsubscribe) => {
+      try {
+        unsubscribe()
+      } catch (err) {
+        console.error("Error unsubscribing event listener:", err)
       }
-    }
+    })
+    eventUnsubscribers.current = []
+  }
 
-    return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current)
+  const handleSessionEvent = useCallback(
+    (data: any) => {
+      // console.log("Session event received:", data)
+      if (mountedRef.current && !statsLoading) {
+        loadDashboardStats()
+        toast.success("Data Diperbarui", {
+          description: "Dashboard telah diperbarui dengan data terbaru",
+        })
       }
-    }
-  }, [autoRefreshEnabled, refreshInterval])
+    },
+    [statsLoading]
+  )
 
-  const handleSessionEvent = useCallback((data: any) => {
-    console.log("Session event received:", data)
-    // Refresh stats when session events occur
-    if (mountedRef.current) {
-      loadDashboardStats()
-      toast.success("Data Diperbarui", {
-        description: "Dashboard telah diperbarui dengan data terbaru",
-      })
-    }
-  }, [])
-
-  const handleChildEvent = useCallback((data: any) => {
-    console.log("Child event received:", data)
-    // Refresh children list when child is added
-    if (mountedRef.current) {
-      loadChildren()
-      loadDashboardStats()
-    }
-  }, [])
+  const handleChildEvent = useCallback(
+    (data: any) => {
+      // console.log("Child event received:", data)
+      if (mountedRef.current && !loading && !statsLoading) {
+        loadChildren()
+        loadDashboardStats()
+      }
+    },
+    [loading, statsLoading]
+  )
 
   const handleAutoRefresh = useCallback(async () => {
+    if (!mountedRef.current || statsLoading) return
+
     try {
-      setIsOnline(true)
+      // console.log("Auto-refresh starting...")
       await loadDashboardStats()
       setLastRefresh(new Date())
+      setIsOnline(true)
+      setRefreshFailureCount(0)
+      // console.log("Auto-refresh completed successfully")
     } catch (err) {
       console.error("Auto-refresh failed:", err)
       setIsOnline(false)
-      // Don't show error toast for auto-refresh failures
-    }
-  }, [])
+      setRefreshFailureCount((prev) => prev + 1)
 
+      // Disable auto-refresh if too many failures
+      if (refreshFailureCount >= 3) {
+        setAutoRefreshEnabled(false)
+        toast.error("Auto-refresh Dinonaktifkan", {
+          description: "Terlalu banyak kesalahan. Silakan refresh manual.",
+        })
+      }
+    }
+  }, [statsLoading, refreshFailureCount])
+
+  // Fix: Only set loading to false after both children and stats are loaded
   const loadInitialData = async () => {
+    setLoading(true)
+    setStatsLoading(true)
+    setError(null)
+    setIsOnline(true)
     try {
-      setLoading(true)
-      await Promise.all([loadChildren(), loadDashboardStats()])
-      setIsOnline(true)
+      // Load children first, then dashboard stats (so children count is correct)
+      const childrenData = await GetAllChildren()
+      setChildren(childrenData)
+      const stats = await GetDashboardStats()
+      setDashboardStats(stats as DashboardStats)
       setLastRefresh(new Date())
+      setIsOnline(true)
+      setError(null)
+      setRefreshFailureCount(0)
+      // console.log("Initial data loaded successfully")
     } catch (err) {
       console.error("Error loading initial data:", err)
       setError("Gagal memuat data dashboard")
       setIsOnline(false)
+      setDashboardStats(null)
     } finally {
       setLoading(false)
+      setStatsLoading(false)
     }
   }
 
   const loadChildren = async () => {
     try {
+      // console.log("Loading children...")
       const childrenData = await GetAllChildren()
       if (mountedRef.current) {
         setChildren(childrenData)
+        // console.log(`Loaded ${childrenData.length} children`)
       }
     } catch (err) {
       console.error("Error loading children:", err)
@@ -152,45 +208,42 @@ export function Dashboard() {
     }
   }
 
+  // In loadDashboardStats, don't set fallback stats if children are not loaded
   const loadDashboardStats = async () => {
+    setStatsLoading(true)
     try {
-      setStatsLoading(true)
       const stats = await GetDashboardStats()
-
-      if (mountedRef.current) {
-        setDashboardStats(stats as DashboardStats)
-        setError(null)
-        setIsOnline(true)
-      }
+      setDashboardStats(stats as DashboardStats)
+      setError(null)
+      setIsOnline(true)
+      setRefreshFailureCount(0)
+      setLastRefresh(new Date())
+      console.log("Dashboard stats updated successfully")
     } catch (err) {
       console.error("Error loading dashboard stats:", err)
       setIsOnline(false)
-      // Use fallback values on error
-      if (mountedRef.current) {
-        setDashboardStats({
-          total_children: children.length,
-          active_sessions: 0,
-          popular_activity: "Tidak ada data",
-          today_sessions: 0,
-          last_updated: new Date().toLocaleString("id-ID"),
-        })
-      }
+      setError("Gagal memuat data statistik dashboard")
     } finally {
-      if (mountedRef.current) {
-        setStatsLoading(false)
-      }
+      setStatsLoading(false)
     }
   }
 
   const handleManualRefresh = async () => {
+    if (statsLoading) {
+      console.log("Manual refresh ignored - already loading")
+      return
+    }
+
     try {
-      setStatsLoading(true)
+      console.log("Manual refresh started")
       await loadDashboardStats()
       setLastRefresh(new Date())
+      setRefreshFailureCount(0)
       toast.success("Berhasil Diperbarui", {
         description: "Data dashboard telah diperbarui",
       })
     } catch (err) {
+      console.error("Manual refresh failed:", err)
       toast.error("Gagal Memperbarui", {
         description: "Terjadi kesalahan saat memperbarui data",
       })
@@ -198,13 +251,16 @@ export function Dashboard() {
   }
 
   const toggleAutoRefresh = () => {
-    setAutoRefreshEnabled(!autoRefreshEnabled)
+    const newState = !autoRefreshEnabled
+    setAutoRefreshEnabled(newState)
+    setRefreshFailureCount(0)
+
     toast.info(
-      autoRefreshEnabled ? "Auto-refresh Dimatikan" : "Auto-refresh Dinyalakan",
+      newState ? "Auto-refresh Dinyalakan" : "Auto-refresh Dimatikan",
       {
-        description: autoRefreshEnabled
-          ? "Data tidak akan diperbarui otomatis"
-          : `Data akan diperbarui setiap ${refreshInterval} detik`,
+        description: newState
+          ? `Data akan diperbarui setiap ${refreshInterval} detik`
+          : "Data tidak akan diperbarui otomatis",
       }
     )
   }
@@ -270,6 +326,11 @@ export function Dashboard() {
             <span className={isOnline ? "text-green-600" : "text-red-600"}>
               {isOnline ? "Online" : "Offline"}
             </span>
+            {refreshFailureCount > 0 && (
+              <span className="text-orange-600 text-xs">
+                ({refreshFailureCount} gagal)
+              </span>
+            )}
           </div>
 
           {/* Auto-refresh Toggle */}
@@ -295,14 +356,6 @@ export function Dashboard() {
             />
             <span>{statsLoading ? "Memperbarui..." : "Perbarui Data"}</span>
           </button>
-          {/* <button
-            onClick={async () => {
-              const count = await GetActiveSessions()
-              toast.info("Active Sessions: " + count)
-            }}
-          >
-            Test GetActiveSessions
-          </button> */}
         </div>
       </div>
 
@@ -318,6 +371,12 @@ export function Dashboard() {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
           <p className="text-sm">{error}</p>
+          <button
+            onClick={loadInitialData}
+            className="mt-2 text-sm text-red-600 underline hover:text-red-800"
+          >
+            Coba Lagi
+          </button>
         </div>
       )}
 
@@ -425,6 +484,24 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Debug Info (remove in production) */}
+      {/* {process.env.NODE_ENV === "development" && (
+        <Card className="bg-gray-50">
+          <CardHeader>
+            <CardTitle className="text-sm">Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs space-y-1">
+            <p>Loading: {loading.toString()}</p>
+            <p>Stats Loading: {statsLoading.toString()}</p>
+            <p>Online: {isOnline.toString()}</p>
+            <p>Auto-refresh: {autoRefreshEnabled.toString()}</p>
+            <p>Failure Count: {refreshFailureCount}</p>
+            <p>Children Count: {children.length}</p>
+            <p>Stats: {dashboardStats ? "Available" : "None"}</p>
+          </CardContent>
+        </Card>
+      )} */}
     </div>
   )
 }

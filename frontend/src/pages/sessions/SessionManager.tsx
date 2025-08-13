@@ -62,6 +62,14 @@ export function SessionManager() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
 
+  // Add debugging state
+  const [debugInfo, setDebugInfo] = useState({
+    progressTimerActive: false,
+    durationTimerActive: false,
+    autoSaveTimerActive: false,
+    lastProgressUpdate: null as Date | null,
+  })
+
   useEffect(() => {
     loadChildren()
 
@@ -116,6 +124,8 @@ export function SessionManager() {
   }, [summaryNotes, activeSession])
 
   const clearAllTimers = () => {
+    console.log("Clearing all timers...")
+
     if (progressTimerRef.current) {
       clearInterval(progressTimerRef.current)
       progressTimerRef.current = null
@@ -128,20 +138,33 @@ export function SessionManager() {
       clearInterval(autoSaveTimerRef.current)
       autoSaveTimerRef.current = null
     }
+
+    setDebugInfo((prev) => ({
+      ...prev,
+      progressTimerActive: false,
+      durationTimerActive: false,
+      autoSaveTimerActive: false,
+    }))
   }
 
   const startProgressUpdates = () => {
-    if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    console.log("Starting progress updates...")
+    clearInterval(progressTimerRef.current || undefined)
 
     progressTimerRef.current = setInterval(() => {
       if (activeSession && mountedRef.current) {
+        console.log("Auto-updating session progress...")
         loadSessionProgress(activeSession.ID)
+        setDebugInfo((prev) => ({ ...prev, lastProgressUpdate: new Date() }))
       }
     }, 10000) // Every 10 seconds for real-time feel
+
+    setDebugInfo((prev) => ({ ...prev, progressTimerActive: true }))
   }
 
   const startDurationTimer = () => {
-    if (durationTimerRef.current) clearInterval(durationTimerRef.current)
+    console.log("Starting duration timer...")
+    clearInterval(durationTimerRef.current || undefined)
 
     durationTimerRef.current = setInterval(() => {
       if (activeSession && mountedRef.current) {
@@ -151,16 +174,22 @@ export function SessionManager() {
         setSessionDuration(Math.floor(durationMs / 1000))
       }
     }, 1000) // Every second for live duration
+
+    setDebugInfo((prev) => ({ ...prev, durationTimerActive: true }))
   }
 
   const startAutoSave = () => {
-    if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
+    console.log("Starting auto-save...")
+    clearInterval(autoSaveTimerRef.current || undefined)
 
     autoSaveTimerRef.current = setInterval(() => {
       if (activeSession && unsavedChanges && mountedRef.current) {
+        console.log("Auto-saving notes...")
         handleAutoSaveNotes()
       }
     }, autoSaveInterval * 1000)
+
+    setDebugInfo((prev) => ({ ...prev, autoSaveTimerActive: true }))
   }
 
   const handleSessionUpdate = useCallback(
@@ -245,7 +274,10 @@ export function SessionManager() {
 
   const loadSessionProgress = async (sessionId: number) => {
     try {
+      console.log(`Loading session progress for session ${sessionId}...`)
       const progress = await GetSessionProgress(sessionId)
+      console.log("Session progress loaded:", progress)
+
       if (mountedRef.current) {
         setSessionProgress(progress)
         setIsOnline(true)
@@ -721,6 +753,36 @@ export function SessionManager() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Debug Info */}
+      {process.env.NODE_ENV === "development" && (
+        <Card className="bg-gray-50">
+          <CardHeader>
+            <CardTitle className="text-sm">Session Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs space-y-1">
+            <p>
+              Progress Timer:{" "}
+              {debugInfo.progressTimerActive ? "Active" : "Inactive"}
+            </p>
+            <p>
+              Duration Timer:{" "}
+              {debugInfo.durationTimerActive ? "Active" : "Inactive"}
+            </p>
+            <p>
+              Auto-save Timer:{" "}
+              {debugInfo.autoSaveTimerActive ? "Active" : "Inactive"}
+            </p>
+            <p>
+              Last Progress Update:{" "}
+              {debugInfo.lastProgressUpdate?.toLocaleTimeString() || "Never"}
+            </p>
+            <p>Session Duration: {formatDuration(sessionDuration)}</p>
+            <p>Unsaved Changes: {unsavedChanges.toString()}</p>
+            <p>Active Session ID: {activeSession?.ID || "None"}</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

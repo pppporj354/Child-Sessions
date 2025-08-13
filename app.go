@@ -95,8 +95,11 @@ func (a *App) DeleteChild(id uint) error {
 
 // StartSession begins a new therapy session for a child
 func (a *App) StartSession(childID uint) (*model.Session, error) {
+    fmt.Printf("Starting session for child ID: %d\n", childID)
+    
     session, err := a.sessionService.StartSession(childID)
     if err != nil {
+        fmt.Printf("Error starting session: %v\n", err)
         return nil, err
     }
     
@@ -106,8 +109,8 @@ func (a *App) StartSession(childID uint) (*model.Session, error) {
         "child_id":   session.ChildID,
         "start_time": session.StartTime,
     })
-    // fmt.Println("Emitted session_started event for session:", session.ID)
     
+    fmt.Printf("Session started successfully. ID: %d\n", session.ID)
     return session, nil
 }
 
@@ -1141,22 +1144,37 @@ func (a *App) GetTodaySessionsCount() (int64, error) {
 
 // GetDashboardStats returns comprehensive dashboard statistics
 func (a *App) GetDashboardStats() (map[string]interface{}, error) {
+    fmt.Println("Getting dashboard stats...")
+    
     stats := make(map[string]interface{})
     
     // Get total children count
     var childrenCount int64
     if err := a.database.Model(&model.Child{}).Count(&childrenCount).Error; err != nil {
+        fmt.Printf("Error counting children: %v\n", err)
         childrenCount = 0
     }
     
     // Get active sessions count
-    activeSessions, _ := a.GetActiveSessions()
+    activeSessions, err := a.GetActiveSessions()
+    if err != nil {
+        fmt.Printf("Error getting active sessions: %v\n", err)
+        activeSessions = 0
+    }
     
     // Get most popular activity
-    popularActivity, _ := a.GetMostPopularActivity()
+    popularActivity, err := a.GetMostPopularActivity()
+    if err != nil {
+        fmt.Printf("Error getting popular activity: %v\n", err)
+        popularActivity = "Tidak ada data"
+    }
     
     // Get today's sessions count
-    todaySessions, _ := a.GetTodaySessionsCount()
+    todaySessions, err := a.GetTodaySessionsCount()
+    if err != nil {
+        fmt.Printf("Error getting today's sessions: %v\n", err)
+        todaySessions = 0
+    }
     
     stats["total_children"] = childrenCount
     stats["active_sessions"] = activeSessions
@@ -1164,6 +1182,7 @@ func (a *App) GetDashboardStats() (map[string]interface{}, error) {
     stats["today_sessions"] = todaySessions
     stats["last_updated"] = time.Now().Format("2006-01-02 15:04:05")
     
+    fmt.Printf("Dashboard stats: %+v\n", stats)
     return stats, nil
 }
 
