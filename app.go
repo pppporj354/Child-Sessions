@@ -95,12 +95,38 @@ func (a *App) DeleteChild(id uint) error {
 
 // StartSession begins a new therapy session for a child
 func (a *App) StartSession(childID uint) (*model.Session, error) {
-	return a.sessionService.StartSession(childID)
+    session, err := a.sessionService.StartSession(childID)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Emit session started event
+    runtime.EventsEmit(a.ctx, "session_started", map[string]interface{}{
+        "session_id": session.ID,
+        "child_id":   session.ChildID,
+        "start_time": session.StartTime,
+    })
+    // fmt.Println("Emitted session_started event for session:", session.ID)
+    
+    return session, nil
 }
 
 // EndSession concludes an active session with summary notes
 func (a *App) EndSession(sessionID uint, summaryNotes string) (*model.Session, error) {
-	return a.sessionService.EndSession(sessionID, summaryNotes)
+    session, err := a.sessionService.EndSession(sessionID, summaryNotes)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Emit session ended event
+    runtime.EventsEmit(a.ctx, "session_ended", map[string]interface{}{
+        "session_id":    session.ID,
+        "child_id":      session.ChildID,
+        "end_time":      session.EndTime,
+        "duration":      session.DurationMinutes,
+    })
+    
+    return session, nil
 }
 
 // GetActiveSession retrieves the currently active session for a child

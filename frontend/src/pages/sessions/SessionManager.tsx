@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback, useRef } from "react"
 import {
   Card,
   CardContent,
@@ -17,6 +17,10 @@ import {
   CheckCircle2,
   TrendingUp,
   FileText,
+  Wifi,
+  WifiOff,
+  Timer,
+  Activity,
 } from "lucide-react"
 import {
   GetAllChildren,
@@ -26,9 +30,12 @@ import {
   GetSessionProgress,
   UpdateSessionSummaryNotes,
   GenerateSessionSummary,
+  AutoPauseInactiveActivities,
 } from "../../../wailsjs/go/main/App"
+import { EventsOn } from "../../../wailsjs/runtime/runtime"
 import { model } from "../../../wailsjs/go/models"
 import { SessionView } from "./SessionView"
+import { toast } from "sonner"
 
 export function SessionManager() {
   const [children, setChildren] = useState<model.Child[]>([])
@@ -43,8 +50,37 @@ export function SessionManager() {
   const [quickSummary, setQuickSummary] = useState<any>(null)
   const [loadingQuickSummary, setLoadingQuickSummary] = useState(false)
 
+  // Real-time features
+  const [isOnline, setIsOnline] = useState(true)
+  const [sessionDuration, setSessionDuration] = useState(0)
+  const [autoSaveInterval, setAutoSaveInterval] = useState(60) // seconds
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null)
+  const [unsavedChanges, setUnsavedChanges] = useState(false)
+
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const durationTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const mountedRef = useRef(true)
+
   useEffect(() => {
     loadChildren()
+
+    // Listen for real-time session events
+    const unsubscribeSessionUpdate = EventsOn(
+      "session_updated",
+      handleSessionUpdate
+    )
+    const unsubscribeActivityUpdate = EventsOn(
+      "activity_updated",
+      handleActivityUpdate
+    )
+
+    return () => {
+      mountedRef.current = false
+      clearAllTimers()
+      if (unsubscribeSessionUpdate) unsubscribeSessionUpdate()
+      if (unsubscribeActivityUpdate) unsubscribeActivityUpdate()
+    }
   }, [])
 
   useEffect(() => {
@@ -53,19 +89,116 @@ export function SessionManager() {
     } else {
       setActiveSession(null)
       setSessionProgress(null)
+      clearAllTimers()
     }
   }, [selectedChildId])
 
-  // Auto-refresh session progress when there's an active session
+  // Real-time session progress updates
   useEffect(() => {
-    if (activeSession) {
-      const interval = setInterval(() => {
-        loadSessionProgress(activeSession.ID)
-      }, 30000) // Every 30 seconds
-
-      return () => clearInterval(interval)
+    if (activeSession && mountedRef.current) {
+      startProgressUpdates()
+      startDurationTimer()
+      startAutoSave()
+    } else {
+      clearAllTimers()
     }
+
+    return () => clearAllTimers()
   }, [activeSession])
+
+  // Auto-save notes
+  useEffect(() => {
+    if (activeSession && summaryNotes !== (activeSession.SummaryNotes || "")) {
+      setUnsavedChanges(true)
+    } else {
+      setUnsavedChanges(false)
+    }
+  }, [summaryNotes, activeSession])
+
+  const clearAllTimers = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current)
+      progressTimerRef.current = null
+    }
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current)
+      durationTimerRef.current = null
+    }
+    if (autoSaveTimerRef.current) {
+      clearInterval(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
+  }
+
+  const startProgressUpdates = () => {
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+
+    progressTimerRef.current = setInterval(() => {
+      if (activeSession && mountedRef.current) {
+        loadSessionProgress(activeSession.ID)
+      }
+    }, 10000) // Every 10 seconds for real-time feel
+  }
+
+  const startDurationTimer = () => {
+    if (durationTimerRef.current) clearInterval(durationTimerRef.current)
+
+    durationTimerRef.current = setInterval(() => {
+      if (activeSession && mountedRef.current) {
+        const now = new Date()
+        const start = new Date(activeSession.StartTime)
+        const durationMs = now.getTime() - start.getTime()
+        setSessionDuration(Math.floor(durationMs / 1000))
+      }
+    }, 1000) // Every second for live duration
+  }
+
+  const startAutoSave = () => {
+    if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
+
+    autoSaveTimerRef.current = setInterval(() => {
+      if (activeSession && unsavedChanges && mountedRef.current) {
+        handleAutoSaveNotes()
+      }
+    }, autoSaveInterval * 1000)
+  }
+
+  const handleSessionUpdate = useCallback(
+    (data: any) => {
+      console.log("Session update received:", data)
+      if (activeSession && data.session_id === activeSession.ID) {
+        loadSessionProgress(activeSession.ID)
+        toast.info("Sesi Diperbarui", {
+          description: "Data sesi telah diperbarui secara real-time",
+        })
+      }
+    },
+    [activeSession]
+  )
+
+  const handleActivityUpdate = useCallback(
+    (data: any) => {
+      console.log("Activity update received:", data)
+      if (activeSession && mountedRef.current) {
+        loadSessionProgress(activeSession.ID)
+      }
+    },
+    [activeSession]
+  )
+
+  const handleAutoSaveNotes = async () => {
+    if (!activeSession || !unsavedChanges) return
+
+    try {
+      await UpdateSessionSummaryNotes(activeSession.ID, summaryNotes)
+      setLastAutoSave(new Date())
+      setUnsavedChanges(false)
+      // Don't show toast for auto-save to avoid spam
+    } catch (err) {
+      console.error("Auto-save failed:", err)
+      setIsOnline(false)
+    }
+  }
 
   const loadChildren = async () => {
     try {
@@ -73,9 +206,11 @@ export function SessionManager() {
       const data = await GetAllChildren()
       setChildren(data)
       setError(null)
+      setIsOnline(true)
     } catch (err) {
       console.error("Error loading children:", err)
       setError("Gagal memuat data anak")
+      setIsOnline(false)
     } finally {
       setLoading(false)
     }
@@ -89,13 +224,20 @@ export function SessionManager() {
       if (session) {
         loadSessionProgress(session.ID)
         setSummaryNotes(session.SummaryNotes || "")
+
+        // Calculate initial duration
+        const now = new Date()
+        const start = new Date(session.StartTime)
+        const durationMs = now.getTime() - start.getTime()
+        setSessionDuration(Math.floor(durationMs / 1000))
       }
       setError(null)
+      setIsOnline(true)
     } catch (err) {
       console.error("Error checking active session:", err)
       setActiveSession(null)
       setSessionProgress(null)
-      // Don't set error here as it's normal not to have an active session
+      setIsOnline(false)
     } finally {
       setLoading(false)
     }
@@ -104,9 +246,13 @@ export function SessionManager() {
   const loadSessionProgress = async (sessionId: number) => {
     try {
       const progress = await GetSessionProgress(sessionId)
-      setSessionProgress(progress)
+      if (mountedRef.current) {
+        setSessionProgress(progress)
+        setIsOnline(true)
+      }
     } catch (err) {
       console.error("Error loading session progress:", err)
+      setIsOnline(false)
     }
   }
 
@@ -118,12 +264,25 @@ export function SessionManager() {
       const newSession = await StartSession(selectedChildId)
       setActiveSession(newSession)
       setSummaryNotes("")
+      setSessionDuration(0)
       setError(null)
-      // Load initial progress
-      loadSessionProgress(newSession.ID)
+      setIsOnline(true)
+
+      toast.success("Sesi Dimulai", {
+        description: `Sesi terapi untuk ${
+          children.find((c) => c.ID === selectedChildId)?.Name
+        } telah dimulai`,
+      })
+
+      // Emit event to update dashboard
+      // EventsEmit is not available in frontend, but backend will handle this
     } catch (err) {
       console.error("Error starting session:", err)
       setError("Gagal memulai sesi")
+      setIsOnline(false)
+      toast.error("Gagal Memulai Sesi", {
+        description: "Terjadi kesalahan saat memulai sesi terapi",
+      })
     } finally {
       setLoading(false)
     }
@@ -137,30 +296,42 @@ export function SessionManager() {
       const summary = await GenerateSessionSummary(activeSession.ID)
       setQuickSummary(summary)
       setShowQuickSummary(true)
+
+      // Auto-populate summary notes if empty
+      if (!summaryNotes.trim() && summary.formatted_summary) {
+        setSummaryNotes(summary.formatted_summary)
+        setUnsavedChanges(true)
+      }
+
+      toast.success("Ringkasan Dibuat", {
+        description:
+          "Ringkasan otomatis telah dibuat berdasarkan aktivitas sesi",
+      })
     } catch (err) {
-      console.error("Error generating quick summary:", err)
-      setError("Gagal membuat ringkasan cepat")
+      console.error("Error generating summary:", err)
+      toast.error("Gagal Membuat Ringkasan", {
+        description: "Terjadi kesalahan saat membuat ringkasan otomatis",
+      })
     } finally {
       setLoadingQuickSummary(false)
     }
   }
 
-  const handleUpdateSummaryNotes = async () => {
+  const handleSaveNotes = async () => {
     if (!activeSession) return
 
     try {
       await UpdateSessionSummaryNotes(activeSession.ID, summaryNotes)
-      // Update the active session with new summary notes
-      setActiveSession((prev) =>
-        prev
-          ? Object.assign(Object.create(Object.getPrototypeOf(prev)), prev, {
-              SummaryNotes: summaryNotes,
-            })
-          : null
-      )
+      setLastAutoSave(new Date())
+      setUnsavedChanges(false)
+      toast.success("Catatan Tersimpan", {
+        description: "Catatan ringkasan telah disimpan",
+      })
     } catch (err) {
-      console.error("Error updating summary notes:", err)
-      setError("Gagal memperbarui catatan ringkasan")
+      console.error("Error saving notes:", err)
+      toast.error("Gagal Menyimpan", {
+        description: "Terjadi kesalahan saat menyimpan catatan",
+      })
     }
   }
 
@@ -169,344 +340,386 @@ export function SessionManager() {
 
     try {
       setLoading(true)
+
+      // Auto-save notes before ending
+      if (unsavedChanges) {
+        await UpdateSessionSummaryNotes(activeSession.ID, summaryNotes)
+      }
+
+      // Auto-pause long-running activities
+      await AutoPauseInactiveActivities(activeSession.ID, 120) // 2 hours max
+
       await EndSession(activeSession.ID, summaryNotes)
       setActiveSession(null)
       setSessionProgress(null)
-      setSummaryNotes("")
       setShowEndConfirmation(false)
-      setError(null)
+      clearAllTimers()
+
+      toast.success("Sesi Berakhir", {
+        description: "Sesi terapi telah berakhir dan data tersimpan",
+      })
+
+      // Refresh dashboard stats
+      loadSessionProgress(activeSession.ID)
     } catch (err) {
       console.error("Error ending session:", err)
-      setError("Gagal mengakhiri sesi")
+      toast.error("Gagal Mengakhiri Sesi", {
+        description: "Terjadi kesalahan saat mengakhiri sesi",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSessionUpdate = useCallback(() => {
-    if (activeSession) {
-      loadSessionProgress(activeSession.ID)
-    }
-  }, [activeSession])
-
-  const selectedChild = selectedChildId
-    ? children.find((c) => c.ID === selectedChildId)
-    : null
-
-  // Calculate session duration for display
-  const getSessionDurationDisplay = () => {
-    if (!activeSession) return ""
-
-    const startTime = new Date(activeSession.StartTime)
-    const currentTime = new Date()
-    const durationMs = currentTime.getTime() - startTime.getTime()
-    const durationMinutes = Math.floor(durationMs / 60000)
-    const hours = Math.floor(durationMinutes / 60)
-    const minutes = durationMinutes % 60
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
 
     if (hours > 0) {
-      return `${hours}j ${minutes}m`
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`
     }
-    return `${minutes}m`
+    return `${minutes}:${secs.toString().padStart(2, "0")}`
   }
+
+  const selectedChild = children.find((c) => c.ID === selectedChildId)
 
   return (
     <div className="space-y-6">
+      {/* Header with Real-time Status */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Manajemen Sesi Terapi</h1>
-        <div className="text-sm text-muted-foreground">
-          <Clock className="inline mr-1" size={16} />
-          Saat ini: {new Date().toLocaleString("id-ID")}
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Calendar size={24} /> Manajemen Sesi Terapi
+        </h1>
+
+        <div className="flex items-center space-x-3">
+          {/* Connection Status */}
+          <div className="flex items-center space-x-1 text-xs">
+            {isOnline ? (
+              <Wifi className="w-3 h-3 text-green-500" />
+            ) : (
+              <WifiOff className="w-3 h-3 text-red-500" />
+            )}
+            <span className={isOnline ? "text-green-600" : "text-red-600"}>
+              {isOnline ? "Online" : "Offline"}
+            </span>
+          </div>
+
+          {/* Auto-save Status */}
+          {activeSession && (
+            <div className="flex items-center space-x-1 text-xs">
+              <FileText className="w-3 h-3 text-blue-500" />
+              <span
+                className={
+                  unsavedChanges ? "text-orange-600" : "text-green-600"
+                }
+              >
+                {unsavedChanges ? "Belum tersimpan" : "Tersimpan"}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Child Selection Card */}
+      {/* Live Session Timer */}
+      {activeSession && (
+        <Card className="border-green-500 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                <Timer className="w-5 h-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800">
+                    Sesi Aktif - {selectedChild?.Name}
+                  </p>
+                  <p className="text-sm text-green-600">
+                    Dimulai:{" "}
+                    {new Date(activeSession.StartTime).toLocaleTimeString(
+                      "id-ID"
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-green-700">
+                  {formatDuration(sessionDuration)}
+                </p>
+                <p className="text-xs text-green-600">
+                  {sessionProgress?.active_activities || 0} aktivitas aktif
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Child Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Pilih Anak</CardTitle>
+          <CardTitle>Pilih Anak untuk Sesi Terapi</CardTitle>
           <CardDescription>
-            Pilih anak untuk memulai atau melanjutkan sesi terapi
+            Pilih anak yang akan menjalani sesi terapi
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading && !activeSession ? (
-            <p>Memuat data...</p>
-          ) : error ? (
-            <p className="text-destructive">{error}</p>
-          ) : children.length === 0 ? (
-            <p>Belum ada data anak. Tambahkan anak terlebih dahulu.</p>
-          ) : (
-            <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Pilih Anak
+              </label>
               <select
+                className="w-full border rounded-md p-2"
                 value={selectedChildId || ""}
                 onChange={(e) =>
                   setSelectedChildId(Number(e.target.value) || null)
                 }
-                className="w-full border rounded-md p-2"
-                disabled={loading}
+                disabled={loading || !!activeSession}
               >
                 <option value="">Pilih anak...</option>
                 {children.map((child) => (
                   <option key={child.ID} value={child.ID}>
-                    {child.Name} - {child.ParentGuardianName}
+                    {child.Name} ({child.Gender})
                   </option>
                 ))}
               </select>
+            </div>
 
-              {selectedChild && !activeSession && (
-                <div className="flex justify-end">
+            <div className="flex items-end">
+              {!activeSession ? (
+                <button
+                  onClick={handleStartSession}
+                  disabled={!selectedChildId || loading}
+                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <PlayCircle size={16} />
+                  <span>{loading ? "Memulai..." : "Mulai Sesi"}</span>
+                </button>
+              ) : (
+                <div className="flex space-x-2">
                   <button
-                    className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
-                    onClick={handleStartSession}
-                    disabled={loading}
+                    onClick={handleGenerateQuickSummary}
+                    disabled={loadingQuickSummary}
+                    className="flex items-center space-x-2 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
-                    <PlayCircle size={16} />
-                    <span>{loading ? "Memulai..." : "Mulai Sesi"}</span>
+                    <TrendingUp size={14} />
+                    <span>
+                      {loadingQuickSummary ? "Membuat..." : "Ringkasan"}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowEndConfirmation(true)}
+                    className="flex items-center space-x-2 bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700"
+                  >
+                    <StopCircle size={14} />
+                    <span>Akhiri Sesi</span>
                   </button>
                 </div>
               )}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Session Progress Overview */}
+      {/* Session Progress Cards */}
       {activeSession && sessionProgress && (
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="pb-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="text-lg">
-                  Sesi Berlangsung: {selectedChild?.Name}
-                </CardTitle>
-                <CardDescription>
-                  Durasi: {getSessionDurationDisplay()} • Mulai:{" "}
-                  {new Date(activeSession.StartTime).toLocaleTimeString(
-                    "id-ID"
-                  )}
-                </CardDescription>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleGenerateQuickSummary}
-                  disabled={loadingQuickSummary}
-                  className="flex items-center space-x-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <TrendingUp size={14} />
-                  <span>
-                    {loadingQuickSummary ? "Membuat..." : "Lihat Progress"}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-3 bg-blue-50 rounded-md">
-                <div className="text-2xl font-bold text-blue-700">
-                  {sessionProgress.total_activities || 0}
-                </div>
-                <div className="text-sm text-blue-600">Total Aktivitas</div>
-              </div>
-              <div className="text-center p-3 bg-orange-50 rounded-md">
-                <div className="text-2xl font-bold text-orange-700">
-                  {sessionProgress.active_activities || 0}
-                </div>
-                <div className="text-sm text-orange-600">
-                  Sedang Berlangsung
-                </div>
-              </div>
-              <div className="text-center p-3 bg-green-50 rounded-md">
-                <div className="text-2xl font-bold text-green-700">
-                  {sessionProgress.completed_activities || 0}
-                </div>
-                <div className="text-sm text-green-600">Selesai</div>
-              </div>
-              <div className="text-center p-3 bg-purple-50 rounded-md">
-                <div className="text-2xl font-bold text-purple-700">
-                  {Math.round(sessionProgress.total_activity_time || 0)}
-                </div>
-                <div className="text-sm text-purple-600">Menit Aktivitas</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Durasi Sesi</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-blue-600">
+                {formatDuration(sessionDuration)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Dimulai{" "}
+                {new Date(activeSession.StartTime).toLocaleTimeString("id-ID")}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Aktivitas Aktif</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-green-600">
+                {sessionProgress.active_activities || 0}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {sessionProgress.completed_activities || 0} selesai
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Total Aktivitas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-purple-600">
+                {sessionProgress.total_activities || 0}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {sessionProgress.total_activity_time || 0} menit total
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
-      {/* Session View */}
+      {/* Session Content */}
       {activeSession && (
         <SessionView
           session={activeSession}
           childName={selectedChild?.Name || ""}
-          onSessionUpdate={handleSessionUpdate}
+          onSessionUpdate={() => loadSessionProgress(activeSession.ID)}
         />
       )}
 
-      {/* End Session Card */}
+      {/* Session Notes */}
       {activeSession && (
-        <Card className="border-t-4 border-t-red-500">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <StopCircle size={20} className="text-red-600" />
-              <span>Akhiri Sesi</span>
+            <CardTitle className="flex items-center justify-between">
+              <span>Catatan Ringkasan Sesi</span>
+              <div className="flex items-center space-x-2 text-sm">
+                {lastAutoSave && (
+                  <span className="text-muted-foreground">
+                    Tersimpan: {lastAutoSave.toLocaleTimeString("id-ID")}
+                  </span>
+                )}
+                <button
+                  onClick={handleSaveNotes}
+                  disabled={!unsavedChanges}
+                  className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Simpan
+                </button>
+              </div>
             </CardTitle>
-            <CardDescription>
-              Tambahkan catatan ringkasan sebelum mengakhiri sesi
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  Catatan Ringkasan Sesi
-                </label>
-                <textarea
-                  placeholder="Tambahkan catatan ringkasan sesi terapi ini..."
-                  value={summaryNotes}
-                  onChange={(e) => setSummaryNotes(e.target.value)}
-                  onBlur={handleUpdateSummaryNotes}
-                  className="w-full border rounded-md p-3"
-                  rows={4}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Catatan akan disimpan otomatis saat Anda berhenti mengetik
-                </p>
-              </div>
-
-              {!showEndConfirmation ? (
-                <div className="flex justify-between">
-                  <button
-                    onClick={handleGenerateQuickSummary}
-                    disabled={loadingQuickSummary}
-                    className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:opacity-50"
-                  >
-                    <FileText size={16} />
-                    <span>
-                      {loadingQuickSummary ? "Membuat..." : "Lihat Ringkasan"}
-                    </span>
-                  </button>
-                  <button
-                    className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-                    onClick={() => setShowEndConfirmation(true)}
-                    disabled={loading}
-                  >
-                    <StopCircle size={16} />
-                    <span>Akhiri Sesi</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <AlertTriangle size={16} className="text-red-600" />
-                    <span className="font-medium text-red-800">
-                      Konfirmasi Akhiri Sesi
-                    </span>
-                  </div>
-                  <p className="text-sm text-red-700 mb-4">
-                    Apakah Anda yakin ingin mengakhiri sesi ini? Pastikan semua
-                    aktivitas telah diselesaikan dan catatan telah lengkap.
-                  </p>
-                  <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => setShowEndConfirmation(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                      disabled={loading}
-                    >
-                      Batal
-                    </button>
-                    <button
-                      onClick={handleEndSession}
-                      className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
-                      disabled={loading}
-                    >
-                      <StopCircle size={14} />
-                      <span>
-                        {loading ? "Mengakhiri..." : "Ya, Akhiri Sesi"}
-                      </span>
-                    </button>
-                  </div>
-                </div>
+            <textarea
+              value={summaryNotes}
+              onChange={(e) => setSummaryNotes(e.target.value)}
+              placeholder="Tulis catatan ringkasan sesi di sini..."
+              className="w-full h-32 border rounded-md p-3 resize-none"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              {unsavedChanges
+                ? "⚠️ Ada perubahan yang belum tersimpan"
+                : "✅ Semua perubahan tersimpan"}
+              {autoSaveInterval > 0 && (
+                <span> • Auto-save setiap {autoSaveInterval} detik</span>
               )}
-            </div>
+            </p>
           </CardContent>
         </Card>
       )}
 
+      {/* End Session Confirmation Modal */}
+      {showEndConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-96">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="text-orange-500" />
+                <span>Konfirmasi Akhiri Sesi</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                Apakah Anda yakin ingin mengakhiri sesi untuk{" "}
+                <strong>{selectedChild?.Name}</strong>?
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Durasi sesi: {formatDuration(sessionDuration)}
+              </p>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleEndSession}
+                  disabled={loading}
+                  className="flex-1 bg-red-600 text-white py-2 rounded-md hover:bg-red-700 disabled:opacity-50"
+                >
+                  {loading ? "Mengakhiri..." : "Ya, Akhiri Sesi"}
+                </button>
+                <button
+                  onClick={() => setShowEndConfirmation(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-md hover:bg-gray-400"
+                >
+                  Batal
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Quick Summary Modal */}
       {showQuickSummary && quickSummary && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="text-lg font-semibold">Progress Sesi Saat Ini</h3>
-              <button
-                onClick={() => setShowQuickSummary(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <span className="text-xl">×</span>
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Ringkasan Sesi Otomatis</CardTitle>
+              <CardDescription>
+                Ringkasan yang dibuat berdasarkan aktivitas dan catatan sesi
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-md">
-                    <div className="text-xl font-bold text-blue-700">
-                      {quickSummary.duration_minutes}m
-                    </div>
-                    <div className="text-sm text-blue-600">Durasi Sesi</div>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-md">
-                    <div className="text-xl font-bold text-green-700">
-                      {quickSummary.completed_activities}/
-                      {quickSummary.total_activities}
-                    </div>
-                    <div className="text-sm text-green-600">
-                      Aktivitas Selesai
-                    </div>
+                <div>
+                  <h4 className="font-medium mb-2">Informasi Sesi</h4>
+                  <div className="text-sm space-y-1">
+                    <p>Anak: {quickSummary.child_name}</p>
+                    <p>Durasi: {quickSummary.duration_minutes} menit</p>
+                    <p>Total Aktivitas: {quickSummary.total_activities}</p>
+                    <p>
+                      Aktivitas Selesai: {quickSummary.completed_activities}
+                    </p>
                   </div>
                 </div>
 
-                {quickSummary.activities_summary &&
-                  quickSummary.activities_summary.length > 0 && (
-                    <div>
-                      <h4 className="font-medium mb-2">Aktivitas Terbaru:</h4>
-                      <div className="space-y-2">
-                        {quickSummary.activities_summary
-                          .slice(-3)
-                          .map((activity: any, index: number) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                            >
-                              <span className="font-medium">
-                                {activity.name}
-                              </span>
-                              <span
-                                className={`text-xs px-2 py-1 rounded ${
-                                  activity.status === "completed"
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-orange-100 text-orange-700"
-                                }`}
-                              >
-                                {activity.status === "completed"
-                                  ? "Selesai"
-                                  : "Berlangsung"}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
+                {quickSummary.formatted_summary && (
+                  <div>
+                    <h4 className="font-medium mb-2">Ringkasan Terformat</h4>
+                    <pre className="text-sm bg-gray-50 p-3 rounded whitespace-pre-wrap">
+                      {quickSummary.formatted_summary}
+                    </pre>
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="p-4 border-t bg-gray-50">
-              <button
-                onClick={() => setShowQuickSummary(false)}
-                className="w-full bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
+
+              <div className="flex space-x-2 mt-6">
+                <button
+                  onClick={() => {
+                    setSummaryNotes(quickSummary.formatted_summary || "")
+                    setShowQuickSummary(false)
+                    setUnsavedChanges(true)
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                >
+                  Gunakan Ringkasan Ini
+                </button>
+                <button
+                  onClick={() => setShowQuickSummary(false)}
+                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                >
+                  Tutup
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

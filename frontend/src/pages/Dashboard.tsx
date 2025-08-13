@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useCallback, useRef } from "react"
 import {
   Card,
   CardContent,
@@ -6,9 +6,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Calendar, Clock, Users, Activity, RefreshCw } from "lucide-react"
-import { GetAllChildren, GetDashboardStats } from "../../wailsjs/go/main/App"
+import {
+  Calendar,
+  Clock,
+  Users,
+  Activity,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+} from "lucide-react"
+import {
+  GetAllChildren,
+  GetDashboardStats,
+  GetActiveSessions,
+} from "../../wailsjs/go/main/App"
+import { EventsOn } from "../../wailsjs/runtime/runtime"
 import { model } from "../../wailsjs/go/models"
+import { toast } from "sonner"
 
 interface DashboardStats {
   total_children: number
@@ -26,18 +40,101 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isOnline, setIsOnline] = useState(true)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
+  const [refreshInterval, setRefreshInterval] = useState(30) // seconds
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     loadInitialData()
+
+    // Listen for session events from backend
+    const unsubscribeSessionStart = EventsOn(
+      "session_started",
+      handleSessionEvent
+    )
+    const unsubscribeSessionEnd = EventsOn("session_ended", handleSessionEvent)
+    const unsubscribeChildAdded = EventsOn("child_added", handleChildEvent)
+
+    // Cleanup on unmount
+    return () => {
+      mountedRef.current = false
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current)
+      }
+      if (unsubscribeSessionStart) unsubscribeSessionStart()
+      if (unsubscribeSessionEnd) unsubscribeSessionEnd()
+      if (unsubscribeChildAdded) unsubscribeChildAdded()
+    }
+  }, [])
+
+  // Auto-refresh setup
+  useEffect(() => {
+    if (autoRefreshEnabled && refreshInterval > 0) {
+      refreshTimerRef.current = setInterval(() => {
+        if (mountedRef.current) {
+          handleAutoRefresh()
+        }
+      }, refreshInterval * 1000)
+    } else {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
+    }
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current)
+      }
+    }
+  }, [autoRefreshEnabled, refreshInterval])
+
+  const handleSessionEvent = useCallback((data: any) => {
+    console.log("Session event received:", data)
+    // Refresh stats when session events occur
+    if (mountedRef.current) {
+      loadDashboardStats()
+      toast.success("Data Diperbarui", {
+        description: "Dashboard telah diperbarui dengan data terbaru",
+      })
+    }
+  }, [])
+
+  const handleChildEvent = useCallback((data: any) => {
+    console.log("Child event received:", data)
+    // Refresh children list when child is added
+    if (mountedRef.current) {
+      loadChildren()
+      loadDashboardStats()
+    }
+  }, [])
+
+  const handleAutoRefresh = useCallback(async () => {
+    try {
+      setIsOnline(true)
+      await loadDashboardStats()
+      setLastRefresh(new Date())
+    } catch (err) {
+      console.error("Auto-refresh failed:", err)
+      setIsOnline(false)
+      // Don't show error toast for auto-refresh failures
+    }
   }, [])
 
   const loadInitialData = async () => {
     try {
       setLoading(true)
       await Promise.all([loadChildren(), loadDashboardStats()])
+      setIsOnline(true)
+      setLastRefresh(new Date())
     } catch (err) {
       console.error("Error loading initial data:", err)
       setError("Gagal memuat data dashboard")
+      setIsOnline(false)
     } finally {
       setLoading(false)
     }
@@ -46,7 +143,9 @@ export function Dashboard() {
   const loadChildren = async () => {
     try {
       const childrenData = await GetAllChildren()
-      setChildren(childrenData)
+      if (mountedRef.current) {
+        setChildren(childrenData)
+      }
     } catch (err) {
       console.error("Error loading children:", err)
       throw new Error("Gagal memuat data anak")
@@ -57,25 +156,69 @@ export function Dashboard() {
     try {
       setStatsLoading(true)
       const stats = await GetDashboardStats()
-      setDashboardStats(stats as DashboardStats)
-      setError(null)
+
+      if (mountedRef.current) {
+        setDashboardStats(stats as DashboardStats)
+        setError(null)
+        setIsOnline(true)
+      }
     } catch (err) {
       console.error("Error loading dashboard stats:", err)
-      // Don't throw error here, just log it and use fallback values
-      setDashboardStats({
-        total_children: children.length,
-        active_sessions: 0,
-        popular_activity: "Tidak ada data",
-        today_sessions: 0,
-        last_updated: new Date().toLocaleString("id-ID"),
-      })
+      setIsOnline(false)
+      // Use fallback values on error
+      if (mountedRef.current) {
+        setDashboardStats({
+          total_children: children.length,
+          active_sessions: 0,
+          popular_activity: "Tidak ada data",
+          today_sessions: 0,
+          last_updated: new Date().toLocaleString("id-ID"),
+        })
+      }
     } finally {
-      setStatsLoading(false)
+      if (mountedRef.current) {
+        setStatsLoading(false)
+      }
     }
   }
 
-  const handleRefreshStats = async () => {
-    await loadDashboardStats()
+  const handleManualRefresh = async () => {
+    try {
+      setStatsLoading(true)
+      await loadDashboardStats()
+      setLastRefresh(new Date())
+      toast.success("Berhasil Diperbarui", {
+        description: "Data dashboard telah diperbarui",
+      })
+    } catch (err) {
+      toast.error("Gagal Memperbarui", {
+        description: "Terjadi kesalahan saat memperbarui data",
+      })
+    }
+  }
+
+  const toggleAutoRefresh = () => {
+    setAutoRefreshEnabled(!autoRefreshEnabled)
+    toast.info(
+      autoRefreshEnabled ? "Auto-refresh Dimatikan" : "Auto-refresh Dinyalakan",
+      {
+        description: autoRefreshEnabled
+          ? "Data tidak akan diperbarui otomatis"
+          : `Data akan diperbarui setiap ${refreshInterval} detik`,
+      }
+    )
+  }
+
+  const formatLastRefresh = (date: Date | null) => {
+    if (!date) return "Belum pernah"
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSeconds = Math.floor(diffMs / 1000)
+
+    if (diffSeconds < 60) return `${diffSeconds} detik yang lalu`
+    const diffMinutes = Math.floor(diffSeconds / 60)
+    if (diffMinutes < 60) return `${diffMinutes} menit yang lalu`
+    return date.toLocaleTimeString("id-ID")
   }
 
   const stats = [
@@ -92,6 +235,7 @@ export function Dashboard() {
       icon: <Clock className="text-green-500" />,
       description: "Sesi terapi aktif hari ini",
       loading: loading || statsLoading,
+      highlight: (dashboardStats?.active_sessions || 0) > 0,
     },
     {
       title: "Aktivitas Populer",
@@ -111,29 +255,64 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Header with Controls */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Selamat Datang di Child Sessions</h1>
 
-        {/* Refresh Button */}
-        <button
-          onClick={handleRefreshStats}
-          disabled={statsLoading}
-          className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RefreshCw
-            className={`w-4 h-4 ${statsLoading ? "animate-spin" : ""}`}
-          />
-          <span>{statsLoading ? "Memperbarui..." : "Perbarui Data"}</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          {/* Connection Status */}
+          <div className="flex items-center space-x-1 text-xs">
+            {isOnline ? (
+              <Wifi className="w-3 h-3 text-green-500" />
+            ) : (
+              <WifiOff className="w-3 h-3 text-red-500" />
+            )}
+            <span className={isOnline ? "text-green-600" : "text-red-600"}>
+              {isOnline ? "Online" : "Offline"}
+            </span>
+          </div>
+
+          {/* Auto-refresh Toggle */}
+          <button
+            onClick={toggleAutoRefresh}
+            className={`text-xs px-2 py-1 rounded ${
+              autoRefreshEnabled
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            Auto-refresh {autoRefreshEnabled ? "ON" : "OFF"}
+          </button>
+
+          {/* Manual Refresh Button */}
+          <button
+            onClick={handleManualRefresh}
+            disabled={statsLoading}
+            className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${statsLoading ? "animate-spin" : ""}`}
+            />
+            <span>{statsLoading ? "Memperbarui..." : "Perbarui Data"}</span>
+          </button>
+          {/* <button
+            onClick={async () => {
+              const count = await GetActiveSessions()
+              toast.info("Active Sessions: " + count)
+            }}
+          >
+            Test GetActiveSessions
+          </button> */}
+        </div>
       </div>
 
-      {/* Last Updated Info */}
-      {dashboardStats?.last_updated && (
-        <div className="text-xs text-muted-foreground">
-          Terakhir diperbarui:{" "}
-          {new Date(dashboardStats.last_updated).toLocaleString("id-ID")}
-        </div>
-      )}
+      {/* Last Refresh Info */}
+      <div className="flex justify-between items-center text-xs text-muted-foreground">
+        <div>Terakhir diperbarui: {formatLastRefresh(lastRefresh)}</div>
+        {autoRefreshEnabled && (
+          <div>Auto-refresh setiap {refreshInterval} detik</div>
+        )}
+      </div>
 
       {/* Error Message */}
       {error && (
@@ -145,7 +324,12 @@ export function Dashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <Card key={index}>
+          <Card
+            key={index}
+            className={
+              stat.highlight ? "ring-2 ring-green-500 bg-green-50" : ""
+            }
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
                 {stat.title}
