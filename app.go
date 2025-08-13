@@ -1054,3 +1054,90 @@ func (a *App) ShowErrorNotification(title, message string) {
     })
 }
 
+// GetActiveSessions returns count of active sessions today
+func (a *App) GetActiveSessions() (int64, error) {
+    var count int64
+    today := time.Now().Format("2006-01-02")
+    err := a.database.Model(&model.Session{}).
+        Where("DATE(start_time) = ? AND end_time IS NULL", today).
+        Count(&count).Error
+    if err != nil {
+        return 0, fmt.Errorf("gagal menghitung sesi aktif: %w", err)
+    }
+    return count, nil
+}
+
+// GetMostPopularActivity returns the most frequently used activity this month
+func (a *App) GetMostPopularActivity() (string, error) {
+    var result struct {
+        Name  string
+        Count int
+    }
+    
+    // Get current month start
+    now := time.Now()
+    monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+    
+    err := a.database.
+        Table("session_activities").
+        Select("activities.name as name, COUNT(*) as count").
+        Joins("JOIN activities ON activities.id = session_activities.activity_id").
+        Joins("JOIN sessions ON sessions.id = session_activities.session_id").
+        Where("sessions.start_time >= ?", monthStart).
+        Group("activities.name").
+        Order("count DESC").
+        Limit(1).
+        Scan(&result).Error
+        
+    if err != nil {
+        return "Tidak ada data", fmt.Errorf("gagal mengambil aktivitas populer: %w", err)
+    }
+    
+    if result.Name == "" {
+        return "Tidak ada data", nil
+    }
+    
+    return result.Name, nil
+}
+
+// GetTodaySessionsCount returns count of sessions scheduled/started today
+func (a *App) GetTodaySessionsCount() (int64, error) {
+    var count int64
+    today := time.Now().Format("2006-01-02")
+    err := a.database.Model(&model.Session{}).
+        Where("DATE(start_time) = ?", today).
+        Count(&count).Error
+    if err != nil {
+        return 0, fmt.Errorf("gagal menghitung sesi hari ini: %w", err)
+    }
+    return count, nil
+}
+
+// GetDashboardStats returns comprehensive dashboard statistics
+func (a *App) GetDashboardStats() (map[string]interface{}, error) {
+    stats := make(map[string]interface{})
+    
+    // Get total children count
+    var childrenCount int64
+    if err := a.database.Model(&model.Child{}).Count(&childrenCount).Error; err != nil {
+        childrenCount = 0
+    }
+    
+    // Get active sessions count
+    activeSessions, _ := a.GetActiveSessions()
+    
+    // Get most popular activity
+    popularActivity, _ := a.GetMostPopularActivity()
+    
+    // Get today's sessions count
+    todaySessions, _ := a.GetTodaySessionsCount()
+    
+    stats["total_children"] = childrenCount
+    stats["active_sessions"] = activeSessions
+    stats["popular_activity"] = popularActivity
+    stats["today_sessions"] = todaySessions
+    stats["last_updated"] = time.Now().Format("2006-01-02 15:04:05")
+    
+    return stats, nil
+}
+

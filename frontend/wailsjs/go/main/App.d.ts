@@ -40,6 +40,8 @@ export function GetActiveActivitiesInSession(arg1:number):Promise<Array<model.Se
 
 export function GetActiveSession(arg1:number):Promise<model.Session>;
 
+export function GetActiveSessions():Promise<number>;
+
 export function GetActivityByID(arg1:number):Promise<model.Activity>;
 
 export function GetAllActivities():Promise<Array<model.Activity>>;
@@ -64,7 +66,11 @@ export function GetChildRewards(arg1:number):Promise<Array<model.Reward>>;
 
 export function GetCurrentTime():Promise<string>;
 
+export function GetDashboardStats():Promise<Record<string, any>>;
+
 export function GetFlashcardsByCategory(arg1:string):Promise<Array<model.Flashcard>>;
+
+export function GetMostPopularActivity():Promise<string>;
 
 export function GetRewardSummary(arg1:number):Promise<Record<string, any>>;
 
@@ -79,6 +85,8 @@ export function GetSessionNotes(arg1:number):Promise<Array<model.Note>>;
 export function GetSessionProgress(arg1:number):Promise<Record<string, any>>;
 
 export function GetSessionsByChild(arg1:number):Promise<Array<model.Session>>;
+
+export function GetTodaySessionsCount():Promise<number>;
 
 export function Greet(arg1:string):Promise<string>;
 

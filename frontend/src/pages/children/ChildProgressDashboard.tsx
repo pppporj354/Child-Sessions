@@ -59,6 +59,75 @@ const COLORS = [
   "#dc2626", // red-600
 ]
 
+const OKLCH_VARIABLES = [
+  "--background",
+  "--foreground",
+  "--card",
+  "--card-foreground",
+  "--popover",
+  "--popover-foreground",
+  "--primary",
+  "--primary-foreground",
+  "--secondary",
+  "--secondary-foreground",
+  "--muted",
+  "--muted-foreground",
+  "--accent",
+  "--accent-foreground",
+  "--destructive",
+  "--border",
+  "--input",
+  "--ring",
+  "--chart-1",
+  "--chart-2",
+  "--chart-3",
+  "--chart-4",
+  "--chart-5",
+  "--sidebar",
+  "--sidebar-foreground",
+  "--sidebar-primary",
+  "--sidebar-primary-foreground",
+  "--sidebar-accent",
+  "--sidebar-accent-foreground",
+  "--sidebar-border",
+  "--sidebar-ring",
+]
+
+// Map your variables to safe colors (adjust as needed for your theme)
+const SAFE_COLORS: Record<string, string> = {
+  "--background": "#fff",
+  "--foreground": "#222",
+  "--card": "#fff",
+  "--card-foreground": "#222",
+  "--popover": "#fff",
+  "--popover-foreground": "#222",
+  "--primary": "#2563eb",
+  "--primary-foreground": "#fff",
+  "--secondary": "#e5e7eb",
+  "--secondary-foreground": "#222",
+  "--muted": "#f3f4f6",
+  "--muted-foreground": "#6b7280",
+  "--accent": "#e0e7ff",
+  "--accent-foreground": "#222",
+  "--destructive": "#ef4444",
+  "--border": "#e5e7eb",
+  "--input": "#e5e7eb",
+  "--ring": "#2563eb",
+  "--chart-1": "#2563eb",
+  "--chart-2": "#16a34a",
+  "--chart-3": "#f59e42",
+  "--chart-4": "#eab308",
+  "--chart-5": "#a21caf",
+  "--sidebar": "#fff",
+  "--sidebar-foreground": "#222",
+  "--sidebar-primary": "#2563eb",
+  "--sidebar-primary-foreground": "#fff",
+  "--sidebar-accent": "#e0e7ff",
+  "--sidebar-accent-foreground": "#222",
+  "--sidebar-border": "#e5e7eb",
+  "--sidebar-ring": "#2563eb",
+}
+
 export function ChildProgressDashboard() {
   const [children, setChildren] = useState<model.Child[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
@@ -261,86 +330,52 @@ export function ChildProgressDashboard() {
       })
 
       const dashboard = document.getElementById("progress-dashboard-export")
-      if (!dashboard) {
-        throw new Error("Dashboard element tidak ditemukan")
-      }
+      if (!dashboard) throw new Error("Dashboard element tidak ditemukan")
 
-      // Create temporary CSS to override oklch colors for html2canvas
-      const tempStyleElement = document.createElement("style")
-      tempStyleElement.textContent = `
-      #progress-dashboard-export * {
-        background-color: white !important;
-        color: black !important;
-        border-color: #e5e7eb !important;
-      }
-      #progress-dashboard-export .bg-blue-50 {
-        background-color: #eff6ff !important;
-      }
-      #progress-dashboard-export .bg-green-50 {
-        background-color: #f0fdf4 !important;
-      }
-      #progress-dashboard-export .bg-orange-50 {
-        background-color: #fff7ed !important;
-      }
-      #progress-dashboard-export .bg-purple-50 {
-        background-color: #faf5ff !important;
-      }
-      #progress-dashboard-export .bg-yellow-50 {
-        background-color: #fefce8 !important;
-      }
-      #progress-dashboard-export .bg-red-50 {
-        background-color: #fef2f2 !important;
-      }
-      #progress-dashboard-export .text-blue-600 {
-        color: #2563eb !important;
-      }
-      #progress-dashboard-export .text-green-600 {
-        color: #16a34a !important;
-      }
-      #progress-dashboard-export .text-purple-600 {
-        color: #9333ea !important;
-      }
-      #progress-dashboard-export .text-yellow-600 {
-        color: #ca8a04 !important;
-      }
-      #progress-dashboard-export .text-blue-700 {
-        color: #1d4ed8 !important;
-      }
-      #progress-dashboard-export .text-green-700 {
-        color: #15803d !important;
-      }
-      #progress-dashboard-export .text-orange-700 {
-        color: #c2410c !important;
-      }
-      #progress-dashboard-export .text-purple-700 {
-        color: #7c3aed !important;
-      }
-      #progress-dashboard-export .text-yellow-700 {
-        color: #a16207 !important;
-      }
-      #progress-dashboard-export .text-muted-foreground {
-        color: #6b7280 !important;
-      }
-      #progress-dashboard-export .border {
-        border-color: #e5e7eb !important;
-      }
-      #progress-dashboard-export .shadow-lg {
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-      }
-    `
+      // 1. Inject style to override all oklch variables and classes
+      const style = document.createElement("style")
+      let cssVars = ":root {"
+      OKLCH_VARIABLES.forEach((v) => {
+        cssVars += `${v}: ${SAFE_COLORS[v] || "#fff"} !important;`
+      })
+      cssVars += "}"
+      style.textContent =
+        cssVars +
+        `
+        #progress-dashboard-export * {
+          background-color: #fff !important;
+          color: #222 !important;
+          border-color: #e5e7eb !important;
+        }
+        .bg-blue-50 { background-color: #eff6ff !important; }
+        .bg-green-50 { background-color: #f0fdf4 !important; }
+        .bg-orange-50 { background-color: #fff7ed !important; }
+        .bg-purple-50 { background-color: #faf5ff !important; }
+        .bg-yellow-50 { background-color: #fefce8 !important; }
+        .bg-red-50 { background-color: #fef2f2 !important; }
+        .text-blue-600 { color: #2563eb !important; }
+        .text-green-600 { color: #16a34a !important; }
+        .text-purple-600 { color: #9333ea !important; }
+        .text-yellow-600 { color: #ca8a04 !important; }
+        .text-blue-700 { color: #1d4ed8 !important; }
+        .text-green-700 { color: #15803d !important; }
+        .text-orange-700 { color: #c2410c !important; }
+        .text-purple-700 { color: #7c3aed !important; }
+        .text-yellow-700 { color: #a16207 !important; }
+        .text-muted-foreground { color: #6b7280 !important; }
+        .border { border-color: #e5e7eb !important; }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05) !important; }
+      `
+      document.head.appendChild(style)
 
-      // Add temporary styles to document
-      document.head.appendChild(tempStyleElement)
-
-      // Wait a moment for styles to apply
+      // 2. Wait for style to apply
       await new Promise((resolve) => setTimeout(resolve, 100))
 
-      // Capture dashboard as canvas with specific options for better compatibility
+      // 3. Render with html2canvas
       const canvas = await html2canvas(dashboard, {
         scale: 1.5,
         useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
+        backgroundColor: "#fff",
         width: dashboard.scrollWidth,
         height: dashboard.scrollHeight,
         removeContainer: true,
@@ -349,35 +384,28 @@ export function ChildProgressDashboard() {
         logging: false,
       })
 
-      // Remove temporary styles
-      document.head.removeChild(tempStyleElement)
+      // 4. Remove style override
+      document.head.removeChild(style)
 
+      // 5. Generate PDF
       const imgData = canvas.toDataURL("image/png", 1.0)
       const pdf = new jsPDF("p", "mm", "a4")
-
-      // Calculate dimensions to fit A4 properly
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
       const imageWidth = canvas.width
       const imageHeight = canvas.height
-
-      // Calculate ratio to fit the page with some margin
       const margin = 10
       const availableWidth = pageWidth - margin * 2
       const availableHeight = pageHeight - margin * 2
-
       const ratio = Math.min(
         availableWidth / imageWidth,
         availableHeight / imageHeight
       )
       const finalWidth = imageWidth * ratio
       const finalHeight = imageHeight * ratio
-
-      // Center the image on the page
       const xOffset = (pageWidth - finalWidth) / 2
       const yOffset = (pageHeight - finalHeight) / 2
 
-      // Add title to PDF
       pdf.setFontSize(16)
       pdf.text(`Progres Terapi - ${selectedChild.Name}`, margin, margin)
       pdf.setFontSize(10)
@@ -386,8 +414,6 @@ export function ChildProgressDashboard() {
         margin,
         margin + 6
       )
-
-      // Add the image with some top margin for the title
       pdf.addImage(
         imgData,
         "PNG",
@@ -397,16 +423,12 @@ export function ChildProgressDashboard() {
         finalHeight - 10
       )
 
-      // Convert PDF to bytes
       const pdfBytes = pdf.output("arraybuffer")
       const uint8Array = new Uint8Array(pdfBytes)
-
-      // Use Wails export function with context parameter
       const filename = `progres_${selectedChild.Name.replace(
         /[^a-zA-Z0-9]/g,
         "_"
       )}_${new Date().toISOString().split("T")[0]}.pdf`
-
       const savedPath = await ExportPDFFile(Array.from(uint8Array), filename)
 
       toast.dismiss()
@@ -417,8 +439,6 @@ export function ChildProgressDashboard() {
           onClick: () => OpenFileInExplorer(savedPath),
         },
       })
-
-      // Show system notification
       await ShowNotification(
         "Export Berhasil",
         `PDF progres ${selectedChild.Name} telah disimpan`

@@ -78,6 +78,10 @@ export function GetActiveSession(arg1) {
   return window['go']['main']['App']['GetActiveSession'](arg1);
 }
 
+export function GetActiveSessions() {
+  return window['go']['main']['App']['GetActiveSessions']();
+}
+
 export function GetActivityByID(arg1) {
   return window['go']['main']['App']['GetActivityByID'](arg1);
 }
@@ -126,8 +130,16 @@ export function GetCurrentTime() {
   return window['go']['main']['App']['GetCurrentTime']();
 }
 
+export function GetDashboardStats() {
+  return window['go']['main']['App']['GetDashboardStats']();
+}
+
 export function GetFlashcardsByCategory(arg1) {
   return window['go']['main']['App']['GetFlashcardsByCategory'](arg1);
+}
+
+export function GetMostPopularActivity() {
+  return window['go']['main']['App']['GetMostPopularActivity']();
 }
 
 export function GetRewardSummary(arg1) {
@@ -156,6 +168,10 @@ export function GetSessionProgress(arg1) {
 
 export function GetSessionsByChild(arg1) {
   return window['go']['main']['App']['GetSessionsByChild'](arg1);
+}
+
+export function GetTodaySessionsCount() {
+  return window['go']['main']['App']['GetTodaySessionsCount']();
 }
 
 export function Greet(arg1) {
