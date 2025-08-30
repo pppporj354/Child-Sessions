@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Award, Star, Gift, Trophy, Plus } from "lucide-react"
 import { AddReward, GetChildRewards } from "../../../wailsjs/go/main/App"
 import { model } from "../../../wailsjs/go/models"
+import { EventsOn } from "../../../wailsjs/runtime/runtime"
 
 interface RewardSectionProps {
   sessionId: number
@@ -27,6 +28,17 @@ export function RewardSection({ sessionId, childId }: RewardSectionProps) {
 
   useEffect(() => {
     loadChildRewards()
+  }, [childId])
+
+  useEffect(() => {
+    const unsub = EventsOn("reward_updated", (data: any) => {
+      if (data && Number(data.child_id) === Number(childId)) {
+        loadChildRewards()
+      }
+    })
+    return () => {
+      if (unsub) unsub()
+    }
   }, [childId])
 
   const loadChildRewards = async () => {

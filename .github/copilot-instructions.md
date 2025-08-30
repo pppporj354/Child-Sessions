@@ -158,3 +158,7 @@ This is a **therapist's toolkit for child sessions** with planned features:
 
 -- https://ui.shadcn.com/docs/theming
 -- https://tailwindcss.com/docs/colors
+
+### Scripts frontends
+
+-- Always use Bun for package management and scripts (dont use npm)

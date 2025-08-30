@@ -22,12 +22,18 @@ import {
   GetRewardSummary,
 } from "../../../wailsjs/go/main/App"
 import { model } from "../../../wailsjs/go/models"
+import { EventsOn } from "../../../wailsjs/runtime/runtime"
+import { toast } from "sonner"
+import { Plus, Trash2, X } from "lucide-react"
+
+// Catatan: Halaman ini menampilkan riwayat reward per anak dan memungkinkan penambahan/penghapusan reward.
 
 export function RewardsSystem() {
   const [children, setChildren] = useState<model.Child[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
   const [childRewards, setChildRewards] = useState<model.Reward[]>([])
   const [rewardSummary, setRewardSummary] = useState<any | null>(null)
+  const [loadingAction, setLoadingAction] = useState(false)
   const [expandedSections, setExpandedSections] = useState<{
     [key: string]: boolean
   }>({
@@ -37,6 +43,12 @@ export function RewardsSystem() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // State untuk tambah reward dari halaman ini (opsional, tanpa sesi)
+  const [showAddReward, setShowAddReward] = useState(false)
+  const [rewardType, setRewardType] = useState("")
+  const [rewardValue, setRewardValue] = useState(1)
+  const [rewardNotes, setRewardNotes] = useState("")
 
   useEffect(() => {
     loadChildren()
@@ -49,6 +61,27 @@ export function RewardsSystem() {
     } else {
       setChildRewards([])
       setRewardSummary(null)
+    }
+  }, [selectedChildId])
+
+  // Dengarkan event reward_updated agar data segar secara real-time
+  useEffect(() => {
+    const unsubReward = EventsOn("reward_updated", (data: any) => {
+      if (!selectedChildId) return
+      // Refresh hanya jika terkait anak terpilih
+      if (data && Number(data.child_id) === Number(selectedChildId)) {
+        loadChildRewards(selectedChildId)
+        loadRewardSummary(selectedChildId)
+      }
+    })
+
+    const unsubChildAdded = EventsOn("child_added", () => {
+      loadChildren()
+    })
+
+    return () => {
+      if (unsubReward) unsubReward()
+      if (unsubChildAdded) unsubChildAdded()
     }
   }, [selectedChildId])
 
@@ -94,6 +127,60 @@ export function RewardsSystem() {
       setError("Gagal memuat ringkasan reward")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteReward = async (rewardId: number) => {
+    try {
+      setLoadingAction(true)
+      const { DeleteReward } = await import("../../../wailsjs/go/main/App")
+      await DeleteReward(rewardId)
+      toast.success("Reward dihapus")
+      if (selectedChildId) {
+        await loadChildRewards(selectedChildId)
+        await loadRewardSummary(selectedChildId)
+      }
+    } catch (err) {
+      console.error("Gagal menghapus reward:", err)
+      toast.error("Gagal menghapus reward")
+    } finally {
+      setLoadingAction(false)
+    }
+  }
+
+  const handleOpenAdd = () => {
+    if (!selectedChildId) {
+      toast.error("Pilih anak terlebih dahulu")
+      return
+    }
+    setShowAddReward(true)
+  }
+
+  const handleSubmitAddReward = async () => {
+    if (!selectedChildId || !rewardType) return
+    try {
+      setLoadingAction(true)
+      const { AddReward } = await import("../../../wailsjs/go/main/App")
+      // Tidak terkait sesi: kirim null sebagai sessionID
+      await AddReward(
+        selectedChildId,
+        null as any,
+        rewardType,
+        rewardValue,
+        rewardNotes
+      )
+      toast.success("Reward ditambahkan")
+      setShowAddReward(false)
+      setRewardType("")
+      setRewardValue(1)
+      setRewardNotes("")
+      await loadChildRewards(selectedChildId)
+      await loadRewardSummary(selectedChildId)
+    } catch (err) {
+      console.error("Gagal menambah reward:", err)
+      toast.error("Gagal menambah reward")
+    } finally {
+      setLoadingAction(false)
     }
   }
 
@@ -193,7 +280,7 @@ export function RewardsSystem() {
                 </div>
                 <button
                   className="flex items-center space-x-2 bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm"
-                  // onClick={() => setShowAddReward(true)}
+                  onClick={handleOpenAdd}
                   disabled={loading}
                 >
                   <Award size={14} />
@@ -202,6 +289,71 @@ export function RewardsSystem() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
+              {showAddReward && (
+                <div className="border rounded-md p-4 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium">Tambah Reward</h4>
+                    <button
+                      className="text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowAddReward(false)}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm mb-1">Jenis Reward</label>
+                      <select
+                        className="w-full border rounded-md p-2"
+                        value={rewardType}
+                        onChange={(e) => setRewardType(e.target.value)}
+                      >
+                        <option value="">Pilih...</option>
+                        <option>Sticker</option>
+                        <option>Bintang</option>
+                        <option>Poin</option>
+                        <option>Hadiah Kecil</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Jumlah/Nilai</label>
+                      <input
+                        type="number"
+                        className="w-full border rounded-md p-2"
+                        min={1}
+                        value={rewardValue}
+                        onChange={(e) => setRewardValue(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Catatan</label>
+                      <input
+                        type="text"
+                        className="w-full border rounded-md p-2"
+                        placeholder="Opsional"
+                        value={rewardNotes}
+                        onChange={(e) => setRewardNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-3 space-x-2">
+                    <button
+                      className="px-3 py-1 border rounded-md text-sm"
+                      onClick={() => setShowAddReward(false)}
+                      disabled={loadingAction}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded-md text-sm bg-green-600 text-white"
+                      onClick={handleSubmitAddReward}
+                      disabled={!rewardType || loadingAction}
+                    >
+                      Tambah
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Rewards Overview */}
               <div className="border-b pb-2">
                 <button
@@ -306,6 +458,16 @@ export function RewardsSystem() {
                                       {reward.Notes}
                                     </span>
                                   )}
+                                  <button
+                                    className="p-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
+                                    title="Hapus Reward"
+                                    onClick={() =>
+                                      handleDeleteReward(reward.ID)
+                                    }
+                                    disabled={loadingAction}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
                                 </div>
                               </div>
                             ))}
