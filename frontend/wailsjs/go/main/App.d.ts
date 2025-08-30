@@ -10,7 +10,7 @@ export function AddReward(arg1:number,arg2:any,arg3:string,arg4:number,arg5:stri
 
 export function AutoPauseInactiveActivities(arg1:number,arg2:number):Promise<Array<model.SessionActivity>>;
 
-export function CreateActivity(arg1:string,arg2:string,arg3:number):Promise<model.Activity>;
+export function CreateActivity(arg1:string,arg2:string,arg3:number,arg4:string,arg5:string):Promise<model.Activity>;
 
 export function CreateChild(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<model.Child>;
 
@@ -19,6 +19,8 @@ export function CreateFlashcard(arg1:string,arg2:string,arg3:string,arg4:string)
 export function CreateGoal(arg1:number,arg2:string,arg3:string,arg4:number,arg5:string):Promise<model.Goal>;
 
 export function CreateNoteTemplate(arg1:string,arg2:string,arg3:string):Promise<model.NoteTemplate>;
+
+export function DeleteActivity(arg1:number):Promise<void>;
 
 export function DeleteChild(arg1:number):Promise<void>;
 
@@ -101,6 +103,8 @@ export function ShowNotification(arg1:string,arg2:string):Promise<void>;
 export function StartActivityInSession(arg1:number,arg2:number,arg3:string):Promise<model.SessionActivity>;
 
 export function StartSession(arg1:number):Promise<model.Session>;
+
+export function UpdateActivity(arg1:number,arg2:string,arg3:string,arg4:number,arg5:string,arg6:string):Promise<model.Activity>;
 
 export function UpdateActivityInSession(arg1:number,arg2:string):Promise<model.SessionActivity>;
 

@@ -18,8 +18,8 @@ export function AutoPauseInactiveActivities(arg1, arg2) {
   return window['go']['main']['App']['AutoPauseInactiveActivities'](arg1, arg2);
 }
 
-export function CreateActivity(arg1, arg2, arg3) {
-  return window['go']['main']['App']['CreateActivity'](arg1, arg2, arg3);
+export function CreateActivity(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateActivity'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function CreateChild(arg1, arg2, arg3, arg4, arg5, arg6) {
@@ -36,6 +36,10 @@ export function CreateGoal(arg1, arg2, arg3, arg4, arg5) {
 
 export function CreateNoteTemplate(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateNoteTemplate'](arg1, arg2, arg3);
+}
+
+export function DeleteActivity(arg1) {
+  return window['go']['main']['App']['DeleteActivity'](arg1);
 }
 
 export function DeleteChild(arg1) {
@@ -200,6 +204,10 @@ export function StartActivityInSession(arg1, arg2, arg3) {
 
 export function StartSession(arg1) {
   return window['go']['main']['App']['StartSession'](arg1);
+}
+
+export function UpdateActivity(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['UpdateActivity'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function UpdateActivityInSession(arg1, arg2) {

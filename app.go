@@ -154,9 +154,19 @@ func (a *App) GetAllActivities() ([]model.Activity, error) {
 	return a.activityService.GetAllActivities()
 }
 
+// UpdateActivity updates an existing activity
+func (a *App) UpdateActivity(id uint, name, description string, defaultDurationMinutes int, category, objectives string) (*model.Activity, error) {
+    return a.activityService.UpdateActivity(id, name, description, defaultDurationMinutes, category, objectives)
+}
+
+// DeleteActivity deletes an activity
+func (a *App) DeleteActivity(id uint) error {
+    return a.activityService.DeleteActivity(id)
+}
+
 // CreateActivity creates a new therapy activity
-func (a *App) CreateActivity(name, description string, defaultDurationMinutes int) (*model.Activity, error) {
-	return a.activityService.CreateActivity(name, description, defaultDurationMinutes)
+func (a *App) CreateActivity(name, description string, defaultDurationMinutes int, category, objectives string) (*model.Activity, error) {
+	return a.activityService.CreateActivity(name, description, defaultDurationMinutes, category, objectives)
 }
 
 // GetActivityByID retrieves a specific activity by ID

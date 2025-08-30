@@ -9,6 +9,7 @@ import { SessionManager } from "./pages/sessions/SessionManager"
 import { ChildProgressDashboard } from "./pages/children/ChildProgressDashboard"
 import { RewardsSystem } from "./pages/rewards/RewardsSystem"
 import { NotesLibrary } from "./pages/notes/NotesLibrary"
+import { ActivityLibrary } from "./pages/activities/ActivityLibrary"
 import { Settings } from "./pages/Settings"
 import { Toaster } from "./components/ui/sonner"
 
@@ -23,6 +24,8 @@ function App() {
         return <ChildrenList />
       case "sessions":
         return <SessionManager />
+      case "activities":
+        return <ActivityLibrary />
       case "progress":
         return <ChildProgressDashboard />
       case "rewards":
@@ -60,7 +63,7 @@ function getPageTitle(page: string): string {
     case "sessions":
       return "Sesi Terapi"
     case "activities":
-      return "Aktivitas"
+      return " Aktivitas"
     case "progress":
       return "Progres Anak"
     case "rewards":

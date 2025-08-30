@@ -458,6 +458,8 @@ export namespace model {
 	    Name: string;
 	    Description: string;
 	    DefaultDurationMinutes: number;
+	    Category: string;
+	    Objectives: string;
 	    SessionActivities: SessionActivity[];
 	
 	    static createFrom(source: any = {}) {
@@ -473,6 +475,8 @@ export namespace model {
 	        this.Name = source["Name"];
 	        this.Description = source["Description"];
 	        this.DefaultDurationMinutes = source["DefaultDurationMinutes"];
+	        this.Category = source["Category"];
+	        this.Objectives = source["Objectives"];
 	        this.SessionActivities = this.convertValues(source["SessionActivities"], SessionActivity);
 	    }
 	

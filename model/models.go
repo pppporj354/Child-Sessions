@@ -8,22 +8,22 @@ import (
 
 // Child represents the 'children' table.
 type Child struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	Name                string    `gorm:"not null"`
 	DateOfBirth         *time.Time
 	Gender              string
 	ParentGuardianName  string
 	ContactInfo         string
-	InitialAssessment   string // This field would be encrypted before saving
-	Sessions            []Session `gorm:"foreignKey:ChildID"` // One-to-many relationship with Session
-	Rewards             []Reward  `gorm:"foreignKey:ChildID"` // One-to-many relationship with Reward
-	Goals               []Goal    `gorm:"foreignKey:ChildID"` // One-to-many relationship with Goal
+	InitialAssessment   string 
+	Sessions            []Session `gorm:"foreignKey:ChildID"` 
+	Rewards             []Reward  `gorm:"foreignKey:ChildID"` 
+	Goals               []Goal    `gorm:"foreignKey:ChildID"` 
 }
 
 // Session represents the 'sessions' table.
 type Session struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	ChildID          uint `gorm:"not null"`
 	Child            Child // Belongs-to relationship with Child
@@ -39,57 +39,59 @@ type Session struct {
 
 // Activity represents the 'activities' table.
 type Activity struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	Name                   string `gorm:"not null;unique"`
 	Description            string
 	DefaultDurationMinutes int
-	SessionActivities      []SessionActivity `gorm:"foreignKey:ActivityID"` // One-to-many relationship with SessionActivity
+	Category               string
+  Objectives             string 
+	SessionActivities      []SessionActivity `gorm:"foreignKey:ActivityID"` 
 }
 
 // SessionActivity represents the 'session_activities' table,
 // linking activities to a specific session.
 type SessionActivity struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	SessionID uint `gorm:"not null"`
-	Session   Session // Belongs-to relationship with Session
+	Session   Session 
 	ActivityID uint `gorm:"not null"`
-	Activity  Activity // Belongs-to relationship with Activity
+	Activity  Activity 
 	StartTime *time.Time
 	EndTime   *time.Time
-	Notes     string // Specific notes related to this activity during the session (potentially encrypted)
+	Notes     string 
 }
 
 // Note represents the 'notes' table for quick note-taking.
 type Note struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	SessionID   uint `gorm:"not null"`
-	Session     Session // Belongs-to relationship with Session
-	NoteText    string `gorm:"not null"` // This field would be encrypted before saving
+	Session     Session 
+	NoteText    string `gorm:"not null"` 
 	Category    string
 	Timestamp   time.Time `gorm:"not null"`
-	IsEncrypted bool      `gorm:"default:false"` // Flag indicating if note_text is encrypted
+	IsEncrypted bool      `gorm:"default:false"` 
 }
 
 // NoteTemplate represents the 'note_templates' table for customizable templates.
 type NoteTemplate struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	TemplateText string `gorm:"not null;unique"`
 	CategoryHint string
-	Keywords     string // Comma-separated keywords
+	Keywords     string 
 }
 
 // Reward represents the 'rewards' table.
 type Reward struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	ChildID   uint `gorm:"not null"`
 	Child     Child // Belongs-to relationship with Child
 	SessionID *uint // Can be null if reward is given outside a specific session
-	Session   Session `gorm:"foreignKey:SessionID"` // Belongs-to relationship with Session (optional)
+	Session   Session `gorm:"foreignKey:SessionID"` 
 	Type      string `gorm:"not null"` // e.g., "Star", "Point", "Sticker"
 	Value     int    `gorm:"default:1"`
 	Timestamp time.Time `gorm:"not null"`
@@ -98,7 +100,7 @@ type Reward struct {
 
 // Goal represents the 'goals' table for tracking therapy goals.
 type Goal struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	ChildID      uint `gorm:"not null"`
 	Child        Child // Belongs-to relationship with Child
@@ -114,26 +116,27 @@ type Goal struct {
 
 // Flashcard represents the 'flashcards' table.
 type Flashcard struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	Category          string `gorm:"not null"`
 	TextContent       string
 	ImagePath         string
 	Description       string
-	SessionFlashcards []SessionFlashcard `gorm:"foreignKey:FlashcardID"` // One-to-many relationship with SessionFlashcard
+	SessionFlashcards []SessionFlashcard `gorm:"foreignKey:FlashcardID"` 
 }
 
 // SessionFlashcard represents the 'session_flashcards' table,
 // logging flashcard usage within a session.
 type SessionFlashcard struct {
-	gorm.Model // Provides ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model 
 
 	SessionID    uint `gorm:"not null"`
-	Session      Session // Belongs-to relationship with Session
+	Session      Session 
 	FlashcardID  uint `gorm:"not null"`
-	Flashcard    Flashcard // Belongs-to relationship with Flashcard
-	ResponseTag  string    // e.g., "Correct", "Incorrect", "Discussed", "Avoided"
+	Flashcard    Flashcard 
+	ResponseTag  string 
 	ResponseNotes string
 	Timestamp    time.Time `gorm:"not null"`
 }
+
 
