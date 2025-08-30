@@ -290,22 +290,22 @@ export function RewardsSystem() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
             <Award className="text-yellow-500" />
             Sistem Reward
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Kelola dan lacak pencapaian reward anak-anak
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {/* Child Selection */}
           <div className="w-full sm:w-64">
             <select
-              className="w-full border rounded-md p-2 bg-white"
+              className="w-full border rounded-md px-2 py-2 bg-white text-sm"
               value={selectedChildId || ""}
               onChange={(e) =>
                 setSelectedChildId(Number(e.target.value) || null)
@@ -362,8 +362,10 @@ export function RewardsSystem() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Jumlah</label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <label className="block text-sm font-medium mb-1 sm:mb-2">
+                  Jumlah
+                </label>
                 <Input
                   type="number"
                   min="1"
@@ -375,11 +377,12 @@ export function RewardsSystem() {
                       value: parseInt(e.target.value) || 1,
                     })
                   }
+                  className="w-full"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <label className="block text-sm font-medium mb-1 sm:mb-2">
                   Catatan (Opsional)
                 </label>
                 <Input
@@ -388,6 +391,7 @@ export function RewardsSystem() {
                   onChange={(e) =>
                     setRewardForm({ ...rewardForm, notes: e.target.value })
                   }
+                  className="w-full"
                 />
               </div>
 
@@ -474,7 +478,7 @@ export function RewardsSystem() {
                   <Button
                     onClick={() => setShowAddReward(true)}
                     disabled={loading}
-                    className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                    className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 px-3 py-2 text-sm"
                   >
                     <Plus size={16} className="mr-2" />
                     Beri Reward
@@ -486,6 +490,7 @@ export function RewardsSystem() {
                       loadRewardSummary(selectedChildId!)
                     }}
                     disabled={loading}
+                    className="px-3 py-2 text-sm"
                   >
                     <BarChart3 size={16} className="mr-2" />
                     Refresh
@@ -499,7 +504,7 @@ export function RewardsSystem() {
           {childRewards.length > 0 && (
             <Card>
               <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 relative">
                     <Search
                       className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -509,14 +514,14 @@ export function RewardsSystem() {
                       placeholder="Cari berdasarkan jenis reward atau catatan..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 text-sm"
                     />
                   </div>
                   <div className="sm:w-48">
                     <select
                       value={filterType}
                       onChange={(e) => setFilterType(e.target.value)}
-                      className="w-full border rounded-md p-2"
+                      className="w-full border rounded-md px-2 py-2 text-sm"
                     >
                       <option value="all">Semua Jenis</option>
                       {rewardTypes.map((type) => (

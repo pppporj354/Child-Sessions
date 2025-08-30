@@ -312,12 +312,14 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header with Controls */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Selamat Datang di Child Sessions</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold">
+          Selamat Datang di Child Sessions
+        </h1>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Connection Status */}
-          <div className="flex items-center space-x-1 text-xs">
+          <div className="flex items-center space-x-1">
             {isOnline ? (
               <Wifi className="w-3 h-3 text-green-500" />
             ) : (
@@ -327,7 +329,7 @@ export function Dashboard() {
               {isOnline ? "Online" : "Offline"}
             </span>
             {refreshFailureCount > 0 && (
-              <span className="text-orange-600 text-xs">
+              <span className="text-orange-600">
                 ({refreshFailureCount} gagal)
               </span>
             )}
@@ -336,7 +338,7 @@ export function Dashboard() {
           {/* Auto-refresh Toggle */}
           <button
             onClick={toggleAutoRefresh}
-            className={`text-xs px-2 py-1 rounded ${
+            className={`px-2 py-1 rounded text-xs ${
               autoRefreshEnabled
                 ? "bg-green-100 text-green-700"
                 : "bg-gray-100 text-gray-600"
@@ -349,12 +351,14 @@ export function Dashboard() {
           <button
             onClick={handleManualRefresh}
             disabled={statsLoading}
-            className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-1 px-2 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw
               className={`w-4 h-4 ${statsLoading ? "animate-spin" : ""}`}
             />
-            <span>{statsLoading ? "Memperbarui..." : "Perbarui Data"}</span>
+            <span className="hidden sm:inline">
+              {statsLoading ? "Memperbarui..." : "Perbarui Data"}
+            </span>
           </button>
         </div>
       </div>

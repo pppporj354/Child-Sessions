@@ -415,10 +415,10 @@ export function SessionManager() {
   return (
     <div className="space-y-6">
       {/* Header with Real-time Status */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Calendar className="h-6 w-6" />
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+            <Calendar className="h-5 w-5 sm:h-6 sm:w-6" />
             Manajemen Sesi Terapi
           </h1>
           <p className="text-gray-600 text-sm">
@@ -426,9 +426,9 @@ export function SessionManager() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Connection Status */}
-          <div className="flex items-center space-x-1 text-xs">
+          <div className="flex items-center space-x-1">
             {isOnline ? (
               <Wifi className="w-3 h-3 text-green-500" />
             ) : (
@@ -441,7 +441,7 @@ export function SessionManager() {
 
           {/* Auto-save Status */}
           {activeSession && (
-            <div className="flex items-center space-x-1 text-xs">
+            <div className="flex items-center space-x-1">
               <FileText className="w-3 h-3 text-blue-500" />
               <span
                 className={
@@ -458,18 +458,18 @@ export function SessionManager() {
       {/* Active Session Status */}
       {activeSession && (
         <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center text-white">
-                  <Timer className="h-6 w-6" />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-green-500 flex items-center justify-center text-white">
+                  <Timer className="h-5 w-5 sm:h-6 sm:w-6" />
                 </div>
                 <div>
-                  <p className="font-semibold text-green-900">
+                  <p className="font-semibold text-green-900 text-sm sm:text-base">
                     Sesi Aktif -{" "}
                     {children.find((c) => c.ID === selectedChildId)?.Name}
                   </p>
-                  <p className="text-sm text-green-600">
+                  <p className="text-xs sm:text-sm text-green-600">
                     Dimulai:{" "}
                     {new Date(activeSession.StartTime).toLocaleTimeString(
                       "id-ID"
@@ -477,8 +477,8 @@ export function SessionManager() {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-green-700">
+              <div className="text-left sm:text-right">
+                <p className="text-xl sm:text-2xl font-bold text-green-700">
                   {formatDuration(sessionDuration)}
                 </p>
                 <p className="text-xs text-green-600">
@@ -499,13 +499,13 @@ export function SessionManager() {
 
       {/* Child Selection with Search */}
       <Card>
-        <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <CardHeader className="pb-3 sm:pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-lg font-bold">
+              <CardTitle className="text-base sm:text-lg font-bold">
                 Pilih Anak untuk Sesi Terapi
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Pilih anak yang akan menjalani sesi terapi
               </CardDescription>
             </div>
@@ -515,7 +515,7 @@ export function SessionManager() {
                 size={isMobile ? "sm" : "default"}
                 onClick={refreshData}
                 disabled={isRefreshing}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 px-2 py-2 text-sm"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}

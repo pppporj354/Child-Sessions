@@ -64,10 +64,10 @@ export function ChildrenList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Manajemen Anak</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold">Manajemen Anak</h1>
         <button
-          className="flex items-center space-x-2 bg-primary text-primary-foreground px-4 py-2 rounded-md"
+          className="flex items-center justify-center space-x-2 bg-primary text-primary-foreground px-3 py-2 text-sm rounded-md"
           onClick={() => {
             setSelectedChild(null)
             setShowAddForm(true)
@@ -109,7 +109,7 @@ export function ChildrenList() {
               size={18}
             />
             <input
-              className="w-full pl-10 pr-4 py-2 border rounded-md"
+              className="w-full pl-10 pr-4 py-2 border rounded-md text-sm"
               placeholder="Cari berdasarkan nama anak atau orang tua..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -131,42 +131,49 @@ export function ChildrenList() {
               {filteredChildren.map((child) => (
                 <div key={child.ID}>
                   <Card>
-                    <CardContent className="p-4 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-semibold text-lg">{child.Name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {child.Gender} • Orang tua: {child.ParentGuardianName}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Kontak: {child.ContactInfo}
-                        </p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEditChild(child)}
-                          className="p-2 text-blue-500 hover:bg-blue-50 rounded-full"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteChild(child.ID)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                        >
-                          <Trash size={18} />
-                        </button>
-                        <button
-                          onClick={() =>
-                            setExpandedChildId(
-                              expandedChildId === child.ID ? null : child.ID
-                            )
-                          }
-                          className={`p-2 text-green-600 hover:bg-green-50 rounded-full ${
-                            expandedChildId === child.ID ? "bg-green-100" : ""
-                          }`}
-                          title="Lihat Riwayat Aktivitas"
-                        >
-                          <List size={18} />
-                        </button>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg">
+                            {child.Name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {child.Gender} • Orang tua:{" "}
+                            {child.ParentGuardianName}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Kontak: {child.ContactInfo}
+                          </p>
+                        </div>
+                        <div className="flex flex-row sm:flex-col gap-2">
+                          <button
+                            onClick={() => handleEditChild(child)}
+                            className="p-2 text-blue-500 hover:bg-blue-50 rounded-full text-sm"
+                            title="Edit"
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteChild(child.ID)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-full text-sm"
+                            title="Hapus"
+                          >
+                            <Trash size={18} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setExpandedChildId(
+                                expandedChildId === child.ID ? null : child.ID
+                              )
+                            }
+                            className={`p-2 text-green-600 hover:bg-green-50 rounded-full text-sm ${
+                              expandedChildId === child.ID ? "bg-green-100" : ""
+                            }`}
+                            title="Lihat Riwayat Aktivitas"
+                          >
+                            <List size={18} />
+                          </button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

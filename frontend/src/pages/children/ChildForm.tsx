@@ -68,7 +68,7 @@ export function ChildForm({ child, onSuccess, onCancel }: ChildFormProps) {
         <div className="bg-red-50 text-red-500 p-3 rounded-md">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <label htmlFor="name" className="block text-sm font-medium">
             Nama Anak <span className="text-red-500">*</span>
@@ -78,7 +78,7 @@ export function ChildForm({ child, onSuccess, onCancel }: ChildFormProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="w-full border rounded-md p-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
           />
         </div>
 
@@ -91,7 +91,7 @@ export function ChildForm({ child, onSuccess, onCancel }: ChildFormProps) {
             value={gender}
             onChange={(e) => setGender(e.target.value)}
             required
-            className="w-full border rounded-md p-2 h-[42px]"
+            className="w-full border rounded-md px-3 py-2 text-sm"
           >
             <option value="">Pilih jenis kelamin</option>
             <option value="Laki-laki">Laki-laki</option>
@@ -108,7 +108,7 @@ export function ChildForm({ child, onSuccess, onCancel }: ChildFormProps) {
             type="date"
             value={dateOfBirth}
             onChange={(e) => setDateOfBirth(e.target.value)}
-            className="w-full border rounded-md p-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
           />
         </div>
 
@@ -124,7 +124,7 @@ export function ChildForm({ child, onSuccess, onCancel }: ChildFormProps) {
             value={parentGuardianName}
             onChange={(e) => setParentGuardianName(e.target.value)}
             required
-            className="w-full border rounded-md p-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
           />
         </div>
 
@@ -138,7 +138,7 @@ export function ChildForm({ child, onSuccess, onCancel }: ChildFormProps) {
             onChange={(e) => setContactInfo(e.target.value)}
             required
             placeholder="Nomor telepon / email"
-            className="w-full border rounded-md p-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -155,22 +155,22 @@ export function ChildForm({ child, onSuccess, onCancel }: ChildFormProps) {
           value={initialAssessment}
           onChange={(e) => setInitialAssessment(e.target.value)}
           rows={4}
-          className="w-full border rounded-md p-2"
+          className="w-full border rounded-md px-3 py-2 text-sm"
         />
       </div>
 
-      <div className="flex justify-end space-x-2 pt-4">
+      <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 border rounded-md"
+          className="px-3 py-2 text-sm border rounded-md"
           disabled={loading}
         >
           Batal
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          className="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md"
           disabled={loading}
         >
           {loading ? "Menyimpan..." : child ? "Perbarui" : "Simpan"}
