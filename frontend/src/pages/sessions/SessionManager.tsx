@@ -756,7 +756,7 @@ export function SessionManager() {
       )}
 
       {/* Debug Info */}
-      {process.env.NODE_ENV === "development" && (
+      {/* {process.env.NODE_ENV === "development" && (
         <Card className="bg-gray-50">
           <CardHeader>
             <CardTitle className="text-sm">Session Debug Info</CardTitle>
@@ -783,7 +783,7 @@ export function SessionManager() {
             <p>Active Session ID: {activeSession?.ID || "None"}</p>
           </CardContent>
         </Card>
-      )}
+      )} */}
     </div>
   )
 }
