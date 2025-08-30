@@ -54,6 +54,10 @@ export function DeleteNoteTemplate(arg1) {
   return window['go']['main']['App']['DeleteNoteTemplate'](arg1);
 }
 
+export function DeleteReward(arg1) {
+  return window['go']['main']['App']['DeleteReward'](arg1);
+}
+
 export function EndActivityInSession(arg1, arg2) {
   return window['go']['main']['App']['EndActivityInSession'](arg1, arg2);
 }
