@@ -292,9 +292,11 @@ export function ActivityLibrary() {
   return (
     <div className="space-y-6">
       {/* Header with Controls */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Pustaka Aktivitas Terapi</h1>
-        <div className="flex items-center space-x-3">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold">
+          Pustaka Aktivitas Terapi
+        </h1>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleManualRefresh}
             disabled={loading}
@@ -390,13 +392,13 @@ export function ActivityLibrary() {
       )}
 
       {/* Search, Filter, and Sort Controls */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mt-6">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6">
+        <div className="flex flex-1 items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2 top-2.5 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
-              className="pl-8 pr-3 py-2 border rounded-md text-sm"
+              className="w-full sm:w-64 pl-8 pr-3 py-2 border rounded-md text-sm"
               placeholder="Cari aktivitas..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -404,7 +406,7 @@ export function ActivityLibrary() {
             />
           </div>
           <select
-            className="border rounded-md px-2 py-2 text-sm"
+            className="border rounded-md px-2 py-2 text-sm max-w-full sm:max-w-[200px]"
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
             disabled={loading}
@@ -442,7 +444,7 @@ export function ActivityLibrary() {
       </div>
 
       {/* Activity List */}
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
           [...Array(3)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -511,7 +513,7 @@ export function ActivityLibrary() {
 
       {/* Add/Edit Activity Modal */}
       {showAddForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-lg">
             <CardHeader>
               <CardTitle>
@@ -550,7 +552,7 @@ export function ActivityLibrary() {
                     disabled={saving}
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <div className="flex-1">
                     <label className="block text-sm font-medium mb-1">
                       Durasi Default (menit)
