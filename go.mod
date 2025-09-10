@@ -5,6 +5,7 @@ go 1.23
 require github.com/wailsapp/wails/v2 v2.10.2
 
 require (
+	encore.dev v1.48.13 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
