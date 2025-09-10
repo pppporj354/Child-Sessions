@@ -69,11 +69,24 @@ func (a *App) GetAllChildren() ([]model.Child, error) {
 
 // CreateChild creates a new child record
 func (a *App) CreateChild(name, gender, parentGuardianName, contactInfo, initialAssessment, dateOfBirth string) (*model.Child, error) {
-	var dobPtr *string
-	if dateOfBirth != "" {
-		dobPtr = &dateOfBirth
-	}
-	return a.childService.CreateChild(name, gender, parentGuardianName, contactInfo, initialAssessment, dobPtr)
+    var dobPtr *string
+    if dateOfBirth != "" {
+        dobPtr = &dateOfBirth
+    }
+    child, err := a.childService.CreateChild(name, gender, parentGuardianName, contactInfo, initialAssessment, dobPtr)
+    if err != nil {
+        return nil, err
+    }
+
+    // Emit child added event for dashboard/frontend updates
+    runtime.EventsEmit(a.ctx, "child_added", map[string]interface{}{
+        "child_id": child.ID,
+        "name":     child.Name,
+        "gender":   child.Gender,
+        "timestamp": time.Now(),
+    })
+
+    return child, nil
 }
 
 // GetChildByID retrieves a specific child by ID
@@ -109,6 +122,13 @@ func (a *App) StartSession(childID uint) (*model.Session, error) {
         "child_id":   session.ChildID,
         "start_time": session.StartTime,
     })
+    // Also emit a generic session update for consumers listening to aggregate updates
+    runtime.EventsEmit(a.ctx, "session_updated", map[string]interface{}{
+        "session_id": session.ID,
+        "child_id":   session.ChildID,
+        "change":     "started",
+        "timestamp":  time.Now(),
+    })
     
     fmt.Printf("Session started successfully. ID: %d\n", session.ID)
     return session, nil
@@ -127,6 +147,13 @@ func (a *App) EndSession(sessionID uint, summaryNotes string) (*model.Session, e
         "child_id":      session.ChildID,
         "end_time":      session.EndTime,
         "duration":      session.DurationMinutes,
+    })
+    // Also emit a generic session update for active listeners
+    runtime.EventsEmit(a.ctx, "session_updated", map[string]interface{}{
+        "session_id": session.ID,
+        "child_id":   session.ChildID,
+        "change":     "ended",
+        "timestamp":  time.Now(),
     })
     
     return session, nil
@@ -196,6 +223,20 @@ func (a *App) StartActivityInSession(sessionID, activityID uint, notes string) (
 		return nil, fmt.Errorf("gagal memuat data aktivitas sesi: %w", err)
 	}
 
+    // Emit activity + session updates for real-time frontend listeners
+    runtime.EventsEmit(a.ctx, "activity_updated", map[string]interface{}{
+        "session_id":           sessionID,
+        "activity_id":          sessionActivity.ActivityID,
+        "session_activity_id":  sessionActivity.ID,
+        "action":               "started",
+        "timestamp":            time.Now(),
+    })
+    runtime.EventsEmit(a.ctx, "session_updated", map[string]interface{}{
+        "session_id": sessionID,
+        "change":     "activity_started",
+        "timestamp":  time.Now(),
+    })
+
 	return sessionActivity, nil
 }
 
@@ -217,6 +258,20 @@ func (a *App) EndActivityInSession(sessionActivityID uint, notes string) (*model
 	if err := a.database.Save(&sessionActivity).Error; err != nil {
 		return nil, fmt.Errorf("gagal mengakhiri aktivitas: %w", err)
 	}
+
+    // Emit activity + session updates
+    runtime.EventsEmit(a.ctx, "activity_updated", map[string]interface{}{
+        "session_id":           sessionActivity.SessionID,
+        "activity_id":          sessionActivity.ActivityID,
+        "session_activity_id":  sessionActivity.ID,
+        "action":               "ended",
+        "timestamp":            time.Now(),
+    })
+    runtime.EventsEmit(a.ctx, "session_updated", map[string]interface{}{
+        "session_id": sessionActivity.SessionID,
+        "change":     "activity_ended",
+        "timestamp":  time.Now(),
+    })
 
 	return &sessionActivity, nil
 }
@@ -247,6 +302,20 @@ func (a *App) UpdateActivityInSession(sessionActivityID uint, notes string) (*mo
     if err := a.database.Preload("Activity").Preload("Session").First(&sessionActivity, sessionActivity.ID).Error; err != nil {
         return nil, fmt.Errorf("gagal memuat data aktivitas sesi: %w", err)
     }
+
+    // Emit activity + session updates
+    runtime.EventsEmit(a.ctx, "activity_updated", map[string]interface{}{
+        "session_id":           sessionActivity.SessionID,
+        "activity_id":          sessionActivity.ActivityID,
+        "session_activity_id":  sessionActivity.ID,
+        "action":               "notes_updated",
+        "timestamp":            time.Now(),
+    })
+    runtime.EventsEmit(a.ctx, "session_updated", map[string]interface{}{
+        "session_id": sessionActivity.SessionID,
+        "change":     "activity_notes_updated",
+        "timestamp":  time.Now(),
+    })
 
     return &sessionActivity, nil
 }
@@ -389,11 +458,44 @@ func (a *App) AddReward(childID uint, sessionID *uint, rewardType string, value 
 	}
 
 	// Load relationships
-	if err := a.database.Preload("Child").First(reward, reward.ID).Error; err != nil {
+    if err := a.database.Preload("Child").First(reward, reward.ID).Error; err != nil {
 		return nil, fmt.Errorf("gagal memuat data reward: %w", err)
 	}
-
+    // Emit reward event for real-time updates
+    runtime.EventsEmit(a.ctx, "reward_updated", map[string]interface{}{
+        "action":     "added",
+        "reward_id":  reward.ID,
+        "child_id":   reward.ChildID,
+        "session_id": reward.SessionID,
+        "type":       reward.Type,
+        "value":      reward.Value,
+        "timestamp":  reward.Timestamp,
+    })
 	return reward, nil
+}
+
+// DeleteReward removes a reward and emits an update event
+func (a *App) DeleteReward(rewardID uint) error {
+    // Load reward details first for event payload
+    var r model.Reward
+    if err := a.database.First(&r, rewardID).Error; err != nil {
+        return fmt.Errorf("reward tidak ditemukan: %w", err)
+    }
+
+    if err := a.rewardService.DeleteReward(rewardID); err != nil {
+        return err
+    }
+
+    runtime.EventsEmit(a.ctx, "reward_updated", map[string]interface{}{
+        "action":     "deleted",
+        "reward_id":  rewardID,
+        "child_id":   r.ChildID,
+        "session_id": r.SessionID,
+        "type":       r.Type,
+        "value":      r.Value,
+        "timestamp":  time.Now(),
+    })
+    return nil
 }
 
 // GetChildRewards retrieves all rewards for a specific child
@@ -848,6 +950,13 @@ func (a *App) UpdateSessionSummaryNotes(sessionID uint, summaryNotes string) err
         return fmt.Errorf("gagal memperbarui catatan ringkasan: %w", err)
     }
 
+    // Emit session update so UI can refresh summary-related views
+    runtime.EventsEmit(a.ctx, "session_updated", map[string]interface{}{
+        "session_id": session.ID,
+        "change":     "summary_notes_updated",
+        "timestamp":  time.Now(),
+    })
+
     return nil
 }
 
@@ -874,6 +983,27 @@ func (a *App) AutoPauseInactiveActivities(sessionID uint, maxDurationMinutes int
         }
         
         pausedActivities = append(pausedActivities, activity)
+    }
+
+    if len(pausedActivities) > 0 {
+        // Emit a single aggregated update to reduce event spam
+        ids := make([]uint, 0, len(pausedActivities))
+        for _, act := range pausedActivities {
+            ids = append(ids, act.ID)
+        }
+        runtime.EventsEmit(a.ctx, "activity_updated", map[string]interface{}{
+            "session_id":          sessionID,
+            "session_activity_ids": ids,
+            "action":              "auto_paused",
+            "count":               len(pausedActivities),
+            "timestamp":           time.Now(),
+        })
+        runtime.EventsEmit(a.ctx, "session_updated", map[string]interface{}{
+            "session_id": sessionID,
+            "change":     "activities_auto_paused",
+            "count":      len(pausedActivities),
+            "timestamp":  time.Now(),
+        })
     }
 
     return pausedActivities, nil

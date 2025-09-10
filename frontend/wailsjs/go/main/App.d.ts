@@ -28,6 +28,8 @@ export function DeleteNote(arg1:number):Promise<void>;
 
 export function DeleteNoteTemplate(arg1:number):Promise<void>;
 
+export function DeleteReward(arg1:number):Promise<void>;
+
 export function EndActivityInSession(arg1:number,arg2:string):Promise<model.SessionActivity>;
 
 export function EndSession(arg1:number,arg2:string):Promise<model.Session>;
